@@ -57,7 +57,7 @@ def modify(data, properties):
             
             if name == "queryFrequency" or name == "queryPeriod":
                 try:
-                    time_val = input("\n" + val_dict[name]["Selection"][user_val] + " as a positive integer greater than 0:\n*** Example Input: 30 ***\n\nEnter value here: ").replace("-","")
+                    time_val = input("\n" + val_dict[name]["Selection"][user_val] + " as a positive integer:\n*** Example Input: 30 ***\n\nEnter value here: ").replace("-","")
                     test2 = int(time_val)
                 except ValueError:
                     print("\nYour Input \"" + time_val + "\" is not valid.\nThe value you entered is not an integer.\nPlease try again.\n")
@@ -83,7 +83,6 @@ def modify(data, properties):
             data['resources'][index]['properties'][name] = val
 
     return data
-    # print(data['resources'][rule_index]['properties']['enabled'])
 
 # Exports modified data into new JSON file.
 def write_out(data, new_path):
@@ -91,7 +90,7 @@ def write_out(data, new_path):
     with open(new_path, "w") as new_rule_template:
         json.dump(data, new_rule_template, indent = 4)
 
-# Controls script
+# Controls script.
 def main():
     data = read_in()
 
