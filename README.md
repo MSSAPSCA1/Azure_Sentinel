@@ -5,7 +5,7 @@ ___
 
 Python script to modify properties of Azure Resource Manager (ARM) templates for bulk modification of Azure Sentinel Analytics Rules.
 
-Notes:
+Notes from Azure Sentinel:
 1.  The Rule Frequency (queryFrequency) value must be between 5 minutes and 14 days.
 2.  The Rule Period (queryPeriod) value must be between 5 minutes and 14 days.
 3.  The Rule Frequency must be less than, or equal to, the Rule Period.
