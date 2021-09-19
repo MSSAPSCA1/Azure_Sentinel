@@ -26,7 +26,7 @@ def read_in():
     new_path = path.replace(file_name, ("NEW_" + file_name))
     return data, new_path
 
-# Statements for future user input and separation by functions
+# Modifies Azure Sentinel Rules based on user selection.
 def modify(data, properties):
 
     val_dict = {"enabled":{"Name":"Rule Status", "Selection":{"1":"Enabled", "2":"Disabled"}, "Value":{"1":True, "2":False}}, "queryFrequency":{"Name":"Rule Frequency", "Selection":{"1":"Enter frequency in Days", "2":"Enter frequency in Hours", "3":"Enter frequency in Minutes"}, "Value":{"1":"P_D", "2":"PT_H", "3":"PT_M"}}, "queryPeriod":{"Name":"Rule Period", "Selection":{"1":"Enter period in Days", "2":"Enter period in Hours", "3":"Enter period in Minutes"}, "Value":{"1":"P_D", "2":"PT_H", "3":"PT_M"}}}
@@ -83,7 +83,6 @@ def modify(data, properties):
             data['resources'][index]['properties'][name] = val
 
     return data
-    # print(data['resources'][rule_index]['properties']['enabled'])
 
 # Exports modified data into new JSON file.
 def write_out(data, new_path):
@@ -91,7 +90,7 @@ def write_out(data, new_path):
     with open(new_path, "w") as new_rule_template:
         json.dump(data, new_rule_template, indent = 4)
 
-# Controls script
+# Controls script.
 def main():
     data = read_in()
 
@@ -118,4 +117,4 @@ def main():
     print("Process Completed.")
     input("\nPress Enter to Exit.")
 
-main() # Script source: https://github.com/nathanjalston/Azure_Sentinel_Hackathon_2021
+main()
