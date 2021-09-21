@@ -1,0 +1,124 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/640535a1-cf4b-4c97-8e55-b4aac78eccc2')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/640535a1-cf4b-4c97-8e55-b4aac78eccc2')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Brute force attack against Azure Portal",
+                "description": "Identifies evidence of brute force activity against Azure Portal by highlighting multiple authentication failures \nand by a successful authentication within a given time window. \n(The query does not enforce any sequence - eg requiring the successful authentication to occur last.)\nDefault Failure count is 5, Default Success count is 1 and default Time Window is 20 minutes.\nReferences: https://docs.microsoft.com/azure/active-directory/reports-monitoring/reference-sign-ins-error-codes.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let failureCountThreshold = 5;\nlet successCountThreshold = 1;\nlet authenticationWindow = 20m;\nlet aadFunc = (tableName:string){\ntable(tableName)\n| extend DeviceDetail = todynamic(DeviceDetail), Status = todynamic(DeviceDetail), LocationDetails = todynamic(LocationDetails)\n| extend OS = DeviceDetail.operatingSystem, Browser = DeviceDetail.browser\n| extend StatusCode = tostring(Status.errorCode), StatusDetails = tostring(Status.additionalDetails)\n| extend State = tostring(LocationDetails.state), City = tostring(LocationDetails.city), Region = tostring(LocationDetails.countryOrRegion)\n| where AppDisplayName has \"Azure Portal\"\n// Split out failure versus non-failure types\n| extend FailureOrSuccess = iff(ResultType in (\"0\", \"50125\", \"50140\", \"70043\", \"70044\"), \"Success\", \"Failure\")\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), IPAddress = make_set(IPAddress), make_set(OS), make_set(Browser), make_set(City),\nmake_set(State), make_set(Region),make_set(ResultType), FailureCount = countif(FailureOrSuccess==\"Failure\"), SuccessCount = countif(FailureOrSuccess==\"Success\") \nby bin(TimeGenerated, authenticationWindow), UserDisplayName, UserPrincipalName, AppDisplayName, Type\n| where FailureCount >= failureCountThreshold and SuccessCount >= successCountThreshold\n| mvexpand IPAddress\n| extend IPAddress = tostring(IPAddress)\n| extend timestamp = StartTime, AccountCustomEntity = UserPrincipalName, IPCustomEntity = IPAddress \n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "28b42356-45af-40a6-a0b4-a554cdfd5d8a",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/ce58587a-97ce-492f-b14c-bee54d8f7d80')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/ce58587a-97ce-492f-b14c-bee54d8f7d80')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Brute Force Attack against GitHub Account",
+                "description": "Attackers who are trying to guess your users' passwords or use brute-force methods to get in. If your organization is using SSO with Azure Active Directory, authentication logs to GitHub.com will be generated. Using the following query can help you identify a sudden increase in failed logon attempt of users.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let LearningPeriod = 7d; \nlet BinTime = 1h; \nlet RunTime = 1h; \nlet StartTime = 1h; \nlet NumberOfStds = 3; \nlet MinThreshold = 10.0; \nlet EndRunTime = StartTime - RunTime; \nlet EndLearningTime = StartTime + LearningPeriod;\nlet aadFunc = (tableName:string){\nlet GitHubFailedSSOLogins = (table(tableName)  \n| where AppDisplayName == \"GitHub.com\" \n| where ResultType != 0); \nGitHubFailedSSOLogins \n| where TimeGenerated between (ago(EndLearningTime) .. ago(StartTime)) \n| summarize FailedLoginsCountInBinTime = count() by  UserPrincipalName, bin(TimeGenerated, BinTime), Type\n| summarize AvgOfFailedLoginsInLearning = avg(FailedLoginsCountInBinTime), StdOfFailedLoginsInLearning = stdev(FailedLoginsCountInBinTime) by UserPrincipalName, Type\n| extend LearningThreshold = max_of(AvgOfFailedLoginsInLearning + StdOfFailedLoginsInLearning * NumberOfStds, MinThreshold)  \n| join kind=innerunique ( \n  GitHubFailedSSOLogins \n  | where TimeGenerated between (ago(StartTime) .. ago(EndRunTime)) \n  | summarize FailedLoginsCountInRunTime = count() by User = Identity, UserPrincipalName, bin(TimeGenerated, BinTime), Type\n) on UserPrincipalName \n| where FailedLoginsCountInRunTime > LearningThreshold\n| extend AccountCustomEntity = UserPrincipalName , timestamp = TimeGenerated\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "97ad74c4-fdd9-4a3f-b6bf-5e28f4f71e06",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

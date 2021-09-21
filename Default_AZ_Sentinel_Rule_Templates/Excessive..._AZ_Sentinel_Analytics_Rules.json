@@ -1,0 +1,133 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/f37cb862-0a7a-4bb7-be5f-c1a463c42226')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/f37cb862-0a7a-4bb7-be5f-c1a463c42226')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Excessive NXDOMAIN DNS Queries (Normalized DNS)",
+                "description": "This creates an incident in the event a client generates excessive amounts of DNS queries for non-existent domains. \nTo use this analytics rule, make sure you have deployed the [ASIM normalization parsers](https://aka.ms/AzSentinelDns)",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let threshold = 200;\nunion isfuzzy=true\n(datatable(TimeGenerated:datetime)[]),\n(imDns\n| where isnotempty(DnsResponseCodeName)\n| where DnsResponseCodeName =~ \"NXDOMAIN\"\n| summarize count() by SrcIpAddr, bin(TimeGenerated,15m)\n| where count_ > threshold\n| join kind=inner (imDns\n    | where isnotempty(DnsResponseCodeName)\n    | where DnsResponseCodeName =~ \"NXDOMAIN\"\n    ) on SrcIpAddr\n| extend timestamp = TimeGenerated, IPCustomEntity = SrcIpAddr)",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CommandAndControl"
+                ],
+                "alertRuleTemplateName": "c3b11fb2-9201-4844-b7b9-6b7bf6d9b851",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "TimeGenerated"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/4d977c8f-6b95-4aaa-9040-05349eaf05ea')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/4d977c8f-6b95-4aaa-9040-05349eaf05ea')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Excessive Windows logon failures",
+                "description": "User has over 50 Windows logon failures today and at least 33% of the count of logon failures over the previous 7 days.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let starttime = 8d;\nlet endtime = 1d;\nlet threshold = 0.333;\nlet countlimit = 50;\nSecurityEvent\n| where TimeGenerated >= ago(endtime)\n| where EventID == 4625 and AccountType =~ \"User\"\n| where IpAddress !in (\"127.0.0.1\", \"::1\")\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), CountToday = count() by EventID, Account, LogonTypeName, SubStatus, AccountType, Computer, WorkstationName, IpAddress, Process\n| join kind=leftouter (\n    SecurityEvent \n    | where TimeGenerated between (ago(starttime) .. ago(endtime))\n    | where EventID == 4625 and AccountType =~ \"User\"\n    | where IpAddress !in (\"127.0.0.1\", \"::1\")\n    | summarize CountPrev7day = count() by EventID, Account, LogonTypeName, SubStatus, AccountType, Computer, WorkstationName, IpAddress\n) on EventID, Account, LogonTypeName, SubStatus, AccountType, Computer, WorkstationName, IpAddress\n| where CountToday >= coalesce(CountPrev7day,0)*threshold and CountToday >= countlimit\n//SubStatus Codes are detailed here - https://docs.microsoft.com/windows/security/threat-protection/auditing/event-4625\n| extend Reason = case(\nSubStatus =~ '0xC000005E', 'There are currently no logon servers available to service the logon request.',\nSubStatus =~ '0xC0000064', 'User logon with misspelled or bad user account',\nSubStatus =~ '0xC000006A', 'User logon with misspelled or bad password',    \nSubStatus =~ '0xC000006D', 'Bad user name or password',\nSubStatus =~ '0xC000006E', 'Unknown user name or bad password',\nSubStatus =~ '0xC000006F', 'User logon outside authorized hours',\nSubStatus =~ '0xC0000070', 'User logon from unauthorized workstation',\nSubStatus =~ '0xC0000071', 'User logon with expired password',\nSubStatus =~ '0xC0000072', 'User logon to account disabled by administrator',\nSubStatus =~ '0xC00000DC', 'Indicates the Sam Server was in the wrong state to perform the desired operation',  \nSubStatus =~ '0xC0000133', 'Clocks between DC and other computer too far out of sync',\nSubStatus =~ '0xC000015B', 'The user has not been granted the requested logon type (aka logon right) at this machine',\nSubStatus =~ '0xC000018C', 'The logon request failed because the trust relationship between the primary domain and the trusted domain failed',\nSubStatus =~ '0xC0000192', 'An attempt was made to logon, but the Netlogon service was not started',\nSubStatus =~ '0xC0000193', 'User logon with expired account',\nSubStatus =~ '0xC0000224', 'User is required to change password at next logon',\nSubStatus =~ '0xC0000225', 'Evidently a bug in Windows and not a risk',\nSubStatus =~ '0xC0000234', 'User logon with account locked',\nSubStatus =~ '0xC00002EE', 'Failure Reason: An Error occurred during Logon',\nSubStatus =~ '0xC0000413', 'Logon Failure: The machine you are logging onto is protected by an authentication firewall. The specified account is not allowed to authenticate to the machine',\nstrcat('Unknown reason substatus: ', SubStatus))\n| extend WorkstationName = iff(WorkstationName == \"-\" or isempty(WorkstationName), Computer , WorkstationName) \n| project StartTime, EndTime, EventID, Account, LogonTypeName, SubStatus, Reason, AccountType, Computer, WorkstationName, IpAddress, CountToday, CountPrev7day, Avg7Day = round(CountPrev7day*1.00/7,2), Process\n| summarize StartTime = min(StartTime), EndTime = max(EndTime), Computer = make_set(Computer,128), IpAddressList = make_set(IpAddress,128), sum(CountToday), sum(CountPrev7day), avg(Avg7Day) \nby EventID, Account, LogonTypeName, SubStatus, Reason, AccountType, WorkstationName, Process\n| order by sum_CountToday desc nulls last \n| extend timestamp = StartTime",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P8D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "2391ce61-8c8d-41ac-9723-d945b2e90720",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Account"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Computer"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Process",
+                        "fieldMappings": [
+                            {
+                                "identifier": "CommandLine",
+                                "columnName": "Process"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

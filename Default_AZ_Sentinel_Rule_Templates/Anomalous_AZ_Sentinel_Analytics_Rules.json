@@ -1,0 +1,195 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/05983327-43ec-4df3-a423-96c0d2167847')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/05983327-43ec-4df3-a423-96c0d2167847')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Anomalous login followed by Teams action",
+                "description": "Detects anomalous IP address usage by user accounts and then checks to see if a suspicious Teams action is performed.\nQuery calculates IP usage Delta for each user account and selects accounts where a delta >= 90% is observed between the most and least used IP.\nTo further reduce results the query performs a prevalence check on the lowest used IP's country, only keeping IP's where the country is unusual for the tenant (dynamic ranges)\nFinally the user accounts activity within Teams logs is checked for suspicious commands (modifying user privileges or admin actions) during the period the suspicious IP was active.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "//The bigger the window the better the data sample size, as we use IP prevalence, more sample data is better.\n//The minimum number of countries that the account has been accessed from [default: 2]\nlet minimumCountries = 2;\n//The delta (%) between the largest in-use IP and the smallest [default: 90]\nlet deltaThreshold = 95;\n//The maximum (%) threshold that the country appears in login data [default: 10]\nlet countryPrevalenceThreshold = 10;\n//The time to project forward after the last login activity [default: 60min]\nlet projectedEndTime = 60min; \n//Get Teams successful signins globally\nlet aadFunc = (tableName:string){\nlet signinData =\n  table(tableName)\n  | where AppDisplayName has \"Teams\"\n  | where ConditionalAccessStatus =~ \"success\"\n  | extend country = tostring(todynamic(LocationDetails)['countryOrRegion'])\n  | where isnotempty(country) and isnotempty(IPAddress);\n// Collect successful signins to teams\nlet loginEvents = \n  signinData\n  | summarize count(), country=any(country), make_list(TimeGenerated) by IPAddress, UserPrincipalName;\n//Calcualte delta between logins\nlet loginDelta =\n  loginEvents\n  | summarize max(count_), min(count_) by UserPrincipalName\n  | extend delta = toreal(max_count_ - min_count_) / max_count_ * 100\n  | where delta >= deltaThreshold;\n//Count number of countries used to sign in\nlet countryCount =\n  loginEvents\n  | summarize Countries = dcount(country) by UserPrincipalName;\n//Join delta and sign in counts to successful logins\nloginDelta\n| join kind=rightouter  (\n  loginEvents\n) on UserPrincipalName\n| join kind=rightouter (\n  countryCount\n) on UserPrincipalName\n//Check where the record meets the minimum required countries\n| where Countries >= minimumCountries\n| join kind=leftouter (\n      signinData\n      | summarize count() by country\n      | join (\n          //Now get the total number of logins from any country and join it to the previous count in a single table\n          signinData\n          | summarize count() by country\n          | summarize sum(count_), make_list(country)\n          | mv-expand list_country\n          | extend country = tostring(list_country)\n      ) on country\n      | summarize by country, count_, sum_count_\n      //Now calculate each countries prevalence within login events\n      | extend prevalence = toreal(count_) / toreal(sum_count_) * 100\n      | project-away sum_count_\n      | order by prevalence\n) on country\n//The % that suspicious country is prevalent in data, this can be configured, less than 10% is uncommon\n| where prevalence < countryPrevalenceThreshold\n| where min_count_ == count_\n//Login start and end times from the JSON object, this is the activity window the suspicious IP was active within\n| extend EventTimes = list_TimeGenerated\n| extend SuspiciousIP = IPAddress\n| project UserPrincipalName, SuspiciousIP, UserIPDelta = delta, SuspiciousLoginCountry = country, SuspiciousCountryPrevalence = prevalence, EventTimes\n//Teams join to collect operations the user account has performed within the given time range\n| join kind=inner( \n  OfficeActivity\n  | where Operation in~ (\"TeamsAdminAction\", \"MemberAdded\", \"MemberRemoved\", \"MemberRoleChanged\", \"AppInstalled\", \"BotAddedToTeam\")\n  | project Operation, UserId=tolower(UserId), OperationTime=TimeGenerated\n) on $left.UserPrincipalName == $right.UserId\n| mv-expand StartTime = EventTimes\n| extend StartTime = make_datetime(StartTime)\n//The end time is projected 60 minutes forward, in case actions took place within the last hour of the final login for the suspicious IP\n| extend ProjectedEndTime = make_datetime(StartTime + projectedEndTime)\n//Limit to operations carried out by the user account in the timeframe the IP was active\n| where OperationTime between (StartTime .. ProjectedEndTime)\n| project UserPrincipalName, SuspiciousIP, StartTime, ProjectedEndTime, OperationTime, Operation, SuspiciousLoginCountry, SuspiciousCountryPrevalence\n//Filter on suspicious actions\n| extend activitySummary = pack(tostring(StartTime), pack(\"Operation\",tostring(Operation), \"OperationTime\", OperationTime))\n| summarize make_bag(activitySummary) by UserPrincipalName, SuspiciousIP, SuspiciousLoginCountry, SuspiciousCountryPrevalence\n| extend IPCustomEntity = SuspiciousIP, AccountCustomEntity = UserPrincipalName\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess",
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "2b701288-b428-4fb8-805e-e4372c574786",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/6a9b9028-67ef-4a39-8e1e-c4fd0b434f9f')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/6a9b9028-67ef-4a39-8e1e-c4fd0b434f9f')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Anomalous sign-in location by user account and authenticating application",
+                "description": "This query over Azure Active Directory sign-in considers all user sign-ins for each Azure Active \nDirectory application and picks out the most anomalous change in location profile for a user within an \nindividual application. An alert is generated for recent sign-ins that have location counts that are anomalous\nover last day but also over the last 3-day and 7-day periods.\nPlease note that on workspaces with larger volume of Signin data (~10M+ events a day) may timeout when using this default query time period.\nIt is recommended that you test and tune this appropriately for the workspace.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let lookBack_long = 7d;\nlet lookBack_med = 3d;\nlet lookBack = 1d;\nlet aadFunc = (tableName:string){\ntable(tableName)\n| where TimeGenerated >= startofday(ago(lookBack_long))\n| extend DeviceDetail = todynamic(DeviceDetail), Status = todynamic(DeviceDetail), LocationDetails = todynamic(LocationDetails)\n| extend locationString = strcat(tostring(LocationDetails.countryOrRegion), \"/\", tostring(LocationDetails.state), \"/\", tostring(LocationDetails.city), \";\") \n| project TimeGenerated, AppDisplayName , UserPrincipalName, locationString \n// Create time series \n| make-series dLocationCount = dcount(locationString) on TimeGenerated in range(startofday(ago(lookBack_long)),now(), 1d) \nby UserPrincipalName, AppDisplayName \n// Compute best fit line for each entry \n| extend (RSquare,Slope,Variance,RVariance,Interception,LineFit)=series_fit_line(dLocationCount) \n// Chart the 3 most interesting lines  \n// A 0-value slope corresponds to an account being completely stable over time for a given Azure Active Directory application\n| where Slope > 0.3\n| top 50 by Slope desc\n| join kind = leftsemi (\ntable(tableName)\n| where TimeGenerated >= startofday(ago(lookBack_med))\n| extend DeviceDetail = todynamic(DeviceDetail), Status = todynamic(DeviceDetail), LocationDetails = todynamic(LocationDetails)\n| extend locationString = strcat(tostring(LocationDetails.countryOrRegion), \"/\", tostring(LocationDetails.state), \"/\", tostring(LocationDetails.city), \";\") \n| project TimeGenerated, AppDisplayName , UserPrincipalName, locationString \n| make-series dLocationCount = dcount(locationString) on TimeGenerated in range(startofday(ago(lookBack_med)) ,now(), 1d) \nby UserPrincipalName, AppDisplayName \n| extend (RSquare,Slope,Variance,RVariance,Interception,LineFit)=series_fit_line(dLocationCount)\n| where Slope > 0.3\n| top 50 by Slope desc\n) on UserPrincipalName, AppDisplayName\n| join kind = leftsemi (\ntable(tableName)\n| where TimeGenerated >= startofday(ago(lookBack))\n| extend DeviceDetail = todynamic(DeviceDetail), Status = todynamic(DeviceDetail), LocationDetails = todynamic(LocationDetails)\n| extend locationString = strcat(tostring(LocationDetails.countryOrRegion), \"/\", tostring(LocationDetails.state), \"/\", tostring(LocationDetails.city), \";\") \n| project TimeGenerated, AppDisplayName , UserPrincipalName, locationString \n| make-series dLocationCount = dcount(locationString) on TimeGenerated in range(startofday(ago(lookBack)) ,now(), 1d) \nby UserPrincipalName, AppDisplayName \n| extend (RSquare,Slope,Variance,RVariance,Interception,LineFit)=series_fit_line(dLocationCount)\n| where Slope > 5\n| top 50 by Slope desc\n// Higher threshold requirement on last day anomaly\n) on UserPrincipalName, AppDisplayName\n| extend timestamp = TimeGenerated, AccountCustomEntity = UserPrincipalName\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "7cb8f77d-c52f-4e46-b82f-3cf2e106224a",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/ab41ce03-d89b-4fd5-888b-2eb631e29137')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/ab41ce03-d89b-4fd5-888b-2eb631e29137')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Anomalous User Agent connection attempt",
+                "description": "Identifies connection attempts (success or fail) from clients with very short or very long User Agent strings and with less than 100 connection attempts.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let short_uaLength = 5;\nlet long_uaLength = 1000;\nlet c_threshold = 100;\nW3CIISLog \n// Exclude local IPs as these create noise\n| where cIP !startswith \"192.168.\" and cIP != \"::1\"\n| where isnotempty(csUserAgent) and csUserAgent !in~ (\"-\", \"MSRPC\") and (string_size(csUserAgent) <= short_uaLength or string_size(csUserAgent) >= long_uaLength)\n| extend csUserAgent_size = string_size(csUserAgent)\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), ConnectionCount = count() by Computer, sSiteName, sPort, csUserAgent, csUserAgent_size, csUserName , csMethod, csUriStem, sIP, cIP, scStatus, scSubStatus, scWin32Status\n| where ConnectionCount < c_threshold\n| extend timestamp = StartTimeUtc, AccountCustomEntity = csUserName, HostCustomEntity = Computer, IPCustomEntity = cIP",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "f845881e-2500-44dc-8ed7-b372af3e1e25",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

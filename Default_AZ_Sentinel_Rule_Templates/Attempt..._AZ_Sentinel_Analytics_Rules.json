@@ -1,0 +1,134 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/bf59bb50-bcc5-4a6e-a136-b4ec109471aa')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/bf59bb50-bcc5-4a6e-a136-b4ec109471aa')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Attempt to bypass conditional access rule in Azure AD",
+                "description": "Identifies an attempt to Bypass conditional access rule(s) in Azure Active Directory.\nThe ConditionalAccessStatus column value details if there was an attempt to bypass Conditional Access\nor if the Conditional access rule was not satisfied (ConditionalAccessStatus == 1).\nReferences: \nhttps://docs.microsoft.com/azure/active-directory/conditional-access/overview\nhttps://docs.microsoft.com/azure/active-directory/reports-monitoring/concept-sign-ins\nhttps://docs.microsoft.com/azure/active-directory/reports-monitoring/reference-sign-ins-error-codes\nConditionalAccessStatus == 0 // Success\nConditionalAccessStatus == 1 // Failure\nConditionalAccessStatus == 2 // Not Applied\nConditionalAccessStatus == 3 // unknown",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let threshold = 1;\nlet aadFunc = (tableName:string){\ntable(tableName)\n| where ConditionalAccessStatus == 1 or ConditionalAccessStatus =~ \"failure\"\n| extend DeviceDetail = todynamic(DeviceDetail), Status = todynamic(DeviceDetail), LocationDetails = todynamic(LocationDetails)\n| extend OS = DeviceDetail.operatingSystem, Browser = DeviceDetail.browser\n| extend State = tostring(LocationDetails.state), City = tostring(LocationDetails.city), Region = tostring(LocationDetails.countryOrRegion) \n| extend StatusCode = tostring(Status.errorCode), StatusDetails = tostring(Status.additionalDetails)\n| extend ConditionalAccessPolicies = todynamic(ConditionalAccessPolicies)\n| extend ConditionalAccessPol0Name = tostring(ConditionalAccessPolicies[0].displayName)\n| extend ConditionalAccessPol1Name = tostring(ConditionalAccessPolicies[1].displayName)\n| extend ConditionalAccessPol2Name = tostring(ConditionalAccessPolicies[2].displayName)\n| extend Status = strcat(StatusCode, \": \", ResultDescription) \n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), Status = make_list(Status), StatusDetails = make_list(StatusDetails), IPAddresses = make_list(IPAddress), IPAddressCount = dcount(IPAddress), CorrelationIds = make_list(CorrelationId) \nby UserPrincipalName, AppDisplayName, tostring(Browser), tostring(OS), City, State, Region, ConditionalAccessPol0Name, ConditionalAccessPol1Name, ConditionalAccessPol2Name, Type\n| where IPAddressCount > threshold and StatusDetails !has \"MFA successfully completed\"\n| mvexpand IPAddresses, Status, StatusDetails, CorrelationIds\n| extend Status = strcat(Status, \" \", StatusDetails)\n| summarize IPAddresses = make_set(IPAddresses), Status = make_set(Status), CorrelationIds = make_set(CorrelationIds) \nby StartTime, EndTime, UserPrincipalName, AppDisplayName, tostring(Browser), tostring(OS), City, State, Region, ConditionalAccessPol0Name, ConditionalAccessPol1Name, ConditionalAccessPol2Name, IPAddressCount, Type\n| extend timestamp = StartTime, AccountCustomEntity = UserPrincipalName, IPCustomEntity = tostring(IPAddresses)\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess",
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "3af9285d-bb98-4a35-ad29-5ea39ba0c628",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/5c827afc-a078-4f06-8fce-eb2d27fda4c7')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/5c827afc-a078-4f06-8fce-eb2d27fda4c7')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Attempts to sign in to disabled accounts",
+                "description": "Identifies failed attempts to sign in to disabled accounts across multiple Azure Applications.\nDefault threshold for Azure Applications attempted to sign in to is 3.\nReferences: https://docs.microsoft.com/azure/active-directory/reports-monitoring/reference-sign-ins-error-codes\n50057 - User account is disabled. The account has been disabled by an administrator.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let threshold = 3;\nlet aadFunc = (tableName:string){\ntable(tableName)\n| where ResultType == \"50057\"\n| where ResultDescription =~ \"User account is disabled. The account has been disabled by an administrator.\"\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), applicationCount = dcount(AppDisplayName), \napplicationSet = make_set(AppDisplayName), count() by UserPrincipalName, IPAddress, Type\n| where applicationCount >= threshold\n| extend timestamp = StartTime, AccountCustomEntity = UserPrincipalName, IPCustomEntity = IPAddress\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "75ea5c39-93e5-489b-b1e1-68fa6c9d2d04",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

@@ -1,0 +1,124 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/74810198-76af-49dc-a894-3d80638603af')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/74810198-76af-49dc-a894-3d80638603af')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "External Upstream Source Added to Azure DevOps Feed",
+                "description": "The detection looks for new external sources added to an Azure DevOps feed. An allow list can be customized to explicitly allow known good sources. An attacker could look to add a malicious feed in order to inject malicious packages into a build pipeline.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "// Add any known allowed sources and source locations to the filter below (the NuGet Gallery has been added here as an example).\nlet allowed_sources = dynamic([\"NuGet Gallery\"]);\nlet allowed_locations = dynamic([\"https://api.nuget.org/v3/index.json\"]);\nAzureDevOpsAuditing\n// Look for feeds created or modified at either the organization or project level\n| where OperationName matches regex \"Artifacts.Feed.(Org|Project).Modify\"\n| where Details has \"UpstreamSources, added\"\n| extend FeedName = tostring(Data.FeedName)\n| extend FeedId = tostring(Data.FeedId)\n| extend UpstreamsAdded = Data.UpstreamsAdded\n// As multiple feeds may be added expand these out\n| mv-expand UpstreamsAdded\n// Only focus on external feeds\n| where UpstreamsAdded.UpstreamSourceType !~ \"internal\"\n| extend SourceLocation = tostring(UpstreamsAdded.Location)\n| extend SourceName = tostring(UpstreamsAdded.Name)\n// Exclude sources and locations in the allow list\n| where SourceLocation !in (allowed_locations) and SourceName !in (allowed_sources)\n| extend SourceProtocol = tostring(UpstreamsAdded.Protocol)\n| extend SourceStatus = tostring(UpstreamsAdded.Status)\n| project-reorder TimeGenerated, OperationName, ScopeDisplayName, ProjectName, FeedName, SourceName, SourceLocation, SourceProtocol, ActorUPN, UserAgent, IpAddress\n| extend timestamp = TimeGenerated",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "adc32a33-1cd6-46f5-8801-e3ed8337885f",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "ActorUPN"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IpAddress"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/cd9c8894-29d0-414b-b985-9767f5260ade')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/cd9c8894-29d0-414b-b985-9767f5260ade')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "External user added and removed in short timeframe",
+                "description": "This detection flags the occurances of external user accounts that are added to a Team and then removed within\none hour.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "OfficeActivity\n| where OfficeWorkload =~ \"MicrosoftTeams\"\n| where Operation =~ \"MemberAdded\"\n| extend UPN = tostring(parse_json(Members)[0].UPN)\n| where UPN contains (\"#EXT#\")\n| project TimeAdded=TimeGenerated, Operation, UPN, UserWhoAdded = UserId, TeamName\n| join (\n OfficeActivity\n| where OfficeWorkload =~ \"MicrosoftTeams\"\n| where Operation =~ \"MemberRemoved\"\n| extend UPN = tostring(parse_json(Members)[0].UPN)\n| where UPN contains (\"#EXT#\")\n| project TimeDeleted=TimeGenerated, Operation, UPN, UserWhoDeleted = UserId, TeamName\n) on UPN\n| where TimeDeleted > TimeAdded\n| project TimeAdded, TimeDeleted, UPN, UserWhoAdded, UserWhoDeleted, TeamName\n| extend timestamp = TimeAdded",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "bff093b2-500e-4ae5-bb49-a5b1423cbd5b",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "UPN"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

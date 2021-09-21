@@ -1,0 +1,72 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/2adfacd2-62e4-485c-869a-24c58478149b')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/2adfacd2-62e4-485c-869a-24c58478149b')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Audit policy manipulation using auditpol utility",
+                "description": "This detects attempt to manipulate audit policies using auditpol command.\nThis technique was seen in relation to Solorigate attack but the results can indicate potential  malicious activity used in different attacks.\nThe process name in each data source is commented out as an adversary could rename it. It is advisable to keep process name commented but \nif the results show unrelated false positives, users may want to uncomment it.\nRefer to auditpol syntax: https://docs.microsoft.com/windows-server/administration/windows-commands/auditpol  \nRefer to our M365 blog for details on use during the Solorigate attack:\nhttps://www.microsoft.com/security/blog/2021/01/20/deep-dive-into-the-solorigate-second-stage-activation-from-sunburst-to-teardrop-and-raindrop/",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let timeframe = 1d;\nlet AccountAllowList = dynamic(['SYSTEM']);\nlet SubCategoryList = dynamic([\"Logoff\", \"Account Lockout\", \"User Account Management\", \"Authorization Policy Change\"]); // Add any Category in the list to be allowed or disallowed\nlet tokens = dynamic([\"clear\", \"remove\", \"success:disable\",\"failure:disable\"]); \n(union isfuzzy=true\n(\nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n//| where Process =~ \"auditpol.exe\" \n| where CommandLine has_any (tokens)\n| where AccountType !~ \"Machine\" and Account !in~ (AccountAllowList)\n| parse CommandLine with * \"/subcategory:\" subcategorytoken\n| extend SubCategory = tostring(split(subcategorytoken, \"\\\"\")[1]) , Toggle =  tostring(split(subcategorytoken, \"\\\"\")[2])\n| where SubCategory in~ (SubCategoryList) //use in~ for inclusion or !in~ for exclusion\n| where Toggle !in~ (\"/failure:disable\", \" /success:enable /failure:disable\") // use this filter if required to exclude certain toggles\n| project TimeGenerated, Computer, Account, SubjectDomainName,  SubjectUserName, Process, ParentProcessName,  CommandLine, SubCategory, Toggle\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer\n),\n(\nDeviceProcessEvents\n| where TimeGenerated >= ago(timeframe)\n// | where InitiatingProcessFileName =~ \"auditpol.exe\" \n| where InitiatingProcessCommandLine has_any (tokens)\n| where AccountName !in~ (AccountAllowList)\n| parse InitiatingProcessCommandLine with * \"/subcategory:\" subcategorytoken\n| extend SubCategory = tostring(split(subcategorytoken, \"\\\"\")[1]) , Toggle =  tostring(split(subcategorytoken, \"\\\"\")[2])\n| where SubCategory in~ (SubCategoryList) //use in~ for inclusion or !in~ for exclusion\n| where Toggle !in~ (\"/failure:disable\", \" /success:enable /failure:disable\") // use this filter if required to exclude certain toggles\n| project TimeGenerated, DeviceName, AccountName, InitiatingProcessAccountDomain, InitiatingProcessAccountName, InitiatingProcessFileName, InitiatingProcessParentFileName,  InitiatingProcessCommandLine, SubCategory, Toggle\n| extend timestamp = TimeGenerated, AccountCustomEntity = AccountName, HostCustomEntity = DeviceName\n),\n(\nEvent\n| where TimeGenerated > ago(timeframe)\n| where Source == \"Microsoft-Windows-Sysmon\"\n| where EventID == 1\n| extend EventData = parse_xml(EventData).DataItem.EventData.Data\n| mv-expand bagexpansion=array EventData\n| evaluate bag_unpack(EventData)\n| extend Key=tostring(['@Name']), Value=['#text']\n| evaluate pivot(Key, any(Value), TimeGenerated, Source, EventLog, Computer, EventLevel, EventLevelName, EventID, UserName, RenderedDescription, MG, ManagementGroupName, Type, _ResourceId)\n// | where OriginalFileName =~ \"auditpol.exe\"\n| where CommandLine has_any (tokens)\n| where User !in~ (AccountAllowList)\n| parse CommandLine with * \"/subcategory:\" subcategorytoken\n| extend SubCategory = tostring(split(subcategorytoken, \"\\\"\")[1]) , Toggle =  tostring(split(subcategorytoken, \"\\\"\")[2])\n| where SubCategory in~ (SubCategoryList) //use in~ for inclusion or !in~ for exclusion\n| where Toggle !in~ (\"/failure:disable\", \" /success:enable /failure:disable\") // use this filter if required to exclude certain toggles\n| project TimeGenerated, Computer, User, Process, ParentImage,  CommandLine, SubCategory, Toggle\n| extend timestamp = TimeGenerated, AccountCustomEntity = User, HostCustomEntity = Computer\n)\n)",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Execution"
+                ],
+                "alertRuleTemplateName": "66276b14-32c5-4226-88e3-080dacc31ce1",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

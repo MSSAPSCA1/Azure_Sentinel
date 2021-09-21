@@ -1,0 +1,103 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/272b2909-33d3-4f0e-88b0-ad854fdda330')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/272b2909-33d3-4f0e-88b0-ad854fdda330')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "DEV-0322 Serv-U related IOCs - July 2021",
+                "description": "Identifies a match across IOC's related to DEV-0322 targeting SolarWinds Serv-U software.",
+                "severity": "High",
+                "enabled": true,
+                "query": "let iocs = externaldata(DateAdded:string,IoC:string,Type:string,TLP:string) [@\"https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/Sample%20Data/Feeds/DEV-0322_SolarWinds_Serv-U_IoC.csv\"] with (format=\"csv\", ignoreFirstRecord=True);\nlet process = (iocs | where Type =~ \"process\" | project IoC);\nlet parentprocess = (iocs | where Type =~ \"parentprocess\" | project IoC);\nlet IPList = (iocs | where Type =~ \"ip\"| project IoC);\nlet IPRegex = '[0-9]{1,3}\\\\.[0-9]{1,3}\\\\.[0-9]{1,3}\\\\.[0-9]{1,3}';\n(union isfuzzy=true\n(CommonSecurityLog\n| where SourceIP in (IPList) or DestinationIP in (IPList) or RequestURL has_any (IPList) or Message has_any (IPList)\n| project TimeGenerated, SourceIP, DestinationIP, Message, SourceUserID, RequestURL, Type\n| extend MessageIP = extract(IPRegex, 0, Message)\n| extend IPMatch = case(SourceIP in (IPList), \"SourceIP\", DestinationIP in (IPList), \"DestinationIP\", MessageIP in (IPList), \"Message\", RequestURL in (IPList), \"RequestUrl\",\"NoMatch\"), AlertDetail = 'Dev-0322 IOC match'\n| extend timestamp = TimeGenerated, IPCustomEntity = case(IPMatch == \"SourceIP\", SourceIP, IPMatch == \"DestinationIP\", DestinationIP, IPMatch == \"Message\", MessageIP, IPMatch == \"RequestUrl\", RequestURL, \"NoMatch\"), AccountCustomEntity = SourceUserID\n),\n(DnsEvents\n| where IPAddresses in (IPList)  \n| project TimeGenerated, Computer, IPAddresses, Name, ClientIP, Type\n| extend DestinationIPAddress = IPAddresses, DNSName = Name, Host = Computer , AlertDetail = 'Dev-0322 IOC match'\n| extend timestamp = TimeGenerated, IPCustomEntity = DestinationIPAddress, HostCustomEntity = Host\n),\n(VMConnection\n| where SourceIp in (IPList) or DestinationIp in (IPList)\n| parse RemoteDnsCanonicalNames with * '[\"' DNSName '\"]' *\n| project TimeGenerated, Computer, Direction, ProcessName, SourceIp, DestinationIp, DestinationPort, RemoteDnsQuestions, DNSName,BytesSent, BytesReceived, RemoteCountry, Type\n| extend IPMatch = case( SourceIp in (IPList), \"SourceIP\", DestinationIp in (IPList), \"DestinationIP\", \"None\") , AlertDetail = 'Dev-0322 IOC match'\n| extend timestamp = TimeGenerated, IPCustomEntity = case(IPMatch == \"SourceIP\", SourceIp, IPMatch == \"DestinationIP\", DestinationIp, \"NoMatch\"), HostCustomEntity = Computer, ProcessCustomEntity = ProcessName\n),\n(Event\n| where Source == \"Microsoft-Windows-Sysmon\"\n| where EventID == 3\n| extend EvData = parse_xml(EventData)\n| extend EventDetail = EvData.DataItem.EventData.Data\n| extend SourceIP = EventDetail.[9].[\"#text\"], DestinationIP = EventDetail.[14].[\"#text\"], Image = EventDetail.[4].[\"#text\"]\n| where SourceIP in (IPList) or DestinationIP in (IPList) \n| project TimeGenerated, SourceIP, DestinationIP, Image, UserName, Computer, Type\n| extend IPMatch = case( SourceIP in (IPList), \"SourceIP\", DestinationIP in (IPList), \"DestinationIP\", \"None\") , AlertDetail = 'Dev-0322 IOC match'\n| extend timestamp = TimeGenerated, AccountCustomEntity = UserName, ProcessCustomEntity = split(Image, '\\\\', -1)[-1], HostCustomEntity = Computer , IPCustomEntity = case(IPMatch == \"SourceIP\", SourceIP, IPMatch == \"DestinationIP\", DestinationIP, \"None\")\n),  \n(OfficeActivity\n| where ClientIP in (IPList) \n| project TimeGenerated, UserAgent, Operation, RecordType, UserId, ClientIP, AlertDetail = 'Dev-0322 IOC match', Type\n| extend timestamp = TimeGenerated, IPCustomEntity = ClientIP, AccountCustomEntity = UserId\n),\n(DeviceNetworkEvents\n| where  RemoteIP in (IPList)\n| project TimeGenerated, ActionType, DeviceId, DeviceName, InitiatingProcessAccountDomain, InitiatingProcessAccountName, InitiatingProcessCommandLine, InitiatingProcessFolderPath, InitiatingProcessId, InitiatingProcessParentFileName, InitiatingProcessFileName, RemoteIP, RemoteUrl, RemotePort, LocalIP, Type\n| extend timestamp = TimeGenerated, IPCustomEntity = RemoteIP, HostCustomEntity = DeviceName,  AlertDetail = 'Dev-0322 IOC match', UrlCustomEntity =RemoteUrl, ProcessCustomEntity = InitiatingProcessFileName\n),\n(WindowsFirewall\n| where SourceIP in (IPList) or DestinationIP in (IPList) \n| project TimeGenerated, Computer, CommunicationDirection, SourceIP, DestinationIP, SourcePort, DestinationPort, Type\n| extend IPMatch = case( SourceIP in (IPList), \"SourceIP\", DestinationIP in (IPList), \"DestinationIP\", \"None\"), AlertDetail = 'Dev-0322 IOC match'\n| extend timestamp = TimeGenerated, HostCustomEntity = Computer , IPCustomEntity = case(IPMatch == \"SourceIP\", SourceIP, IPMatch == \"DestinationIP\", DestinationIP, \"None\")\n),\n(AzureDiagnostics\n| where ResourceType == \"AZUREFIREWALLS\"\n| where Category == \"AzureFirewallDnsProxy\"\n| project TimeGenerated,Resource, msg_s, Type\n| parse msg_s with \"DNS Request: \" ClientIP \":\" ClientPort \" - \" QueryID \" \" Request_Type \" \" Request_Class \" \" Request_Name \". \" Request_Protocol \" \" Request_Size \" \" EDNSO_DO \" \" EDNS0_Buffersize \" \" Responce_Code \" \" Responce_Flags \" \" Responce_Size \" \" Response_Duration\n| where  ClientIP in (IPList)\n| extend timestamp = TimeGenerated, DNSName = Request_Name, IPCustomEntity = ClientIP, AlertDetail = 'Dev-0322 IOC match'\n),\n(AzureDiagnostics \n| where ResourceType == \"AZUREFIREWALLS\"\n| where Category == \"AzureFirewallApplicationRule\"\n| project TimeGenerated,Resource, msg_s\n| parse msg_s with Protocol 'request from ' SourceHost ':' SourcePort 'to ' DestinationHost ':' DestinationPort '. Action:' Action\n| where isnotempty(DestinationHost)\n| where SourceHost in (IPList)\n| extend timestamp = TimeGenerated, DNSName = DestinationHost, IPCustomEntity = SourceHost, AlertDetail = 'Dev-0322 IOC match'\n),\n(Event\n| where Source == \"Microsoft-Windows-Sysmon\"\n| extend EvData = parse_xml(EventData)\n| extend EventDetail = EvData.DataItem.EventData.Data\n| extend ParentImage = EventDetail.[20].[\"#text\"], Image = EventDetail.[4].[\"#text\"]\n| where ( ParentImage has_any (parentprocess) and Image has_any (process))\n| parse EventDetail with * 'SHA256=' SHA256 '\",' *\n| project TimeGenerated, EventDetail, UserName, Computer, Type, Source, SHA256,Image, ParentImage \n| extend Type = strcat(Type, \": \", Source), Account = UserName, FileHash = SHA256, AlertDetail = 'Dev-0322 IOC match'\n| extend timestamp = TimeGenerated, HostCustomEntity = Computer , AccountCustomEntity = Account, ProcessCustomEntity = split(Image, '\\\\', -1)[-1], FileHashCustomEntity = FileHash\n),\n(DeviceFileEvents\n| extend CommandLineIP = extract(IPRegex, 0,InitiatingProcessCommandLine)\n| where (InitiatingProcessFileName in (process) and InitiatingProcessParentFileName in (parentprocess))  or CommandLineIP in (IPList)\n| project TimeGenerated, ActionType, DeviceId, DeviceName, InitiatingProcessAccountDomain, InitiatingProcessAccountName, InitiatingProcessCommandLine, InitiatingProcessFolderPath, InitiatingProcessId, InitiatingProcessParentFileName, InitiatingProcessFileName, RequestAccountName, RequestSourceIP, InitiatingProcessSHA256, Type, CommandLineIP\n| extend Account = RequestAccountName, Computer = DeviceName, IPAddress = RequestSourceIP, CommandLine = InitiatingProcessCommandLine, FileHash = InitiatingProcessSHA256, AlertDetail = 'Dev-0322 IOC match'\n| extend timestamp = TimeGenerated, HostCustomEntity = Computer , AccountCustomEntity = Account, ProcessCustomEntity = InitiatingProcessFileName, FileHashCustomEntity = FileHash, IPCustomEntity = CommandLineIP\n),\n(DeviceEvents\n| extend CommandLineIP = extract(IPRegex, 0,InitiatingProcessCommandLine)\n| where (InitiatingProcessFileName in (process) and InitiatingProcessParentFileName in (parentprocess)) or CommandLineIP in (IPList)\n| project TimeGenerated, ActionType, DeviceId, DeviceName, InitiatingProcessAccountDomain, InitiatingProcessAccountName, InitiatingProcessCommandLine, InitiatingProcessFolderPath, InitiatingProcessId, InitiatingProcessParentFileName, InitiatingProcessFileName, InitiatingProcessSHA256, Type, CommandLineIP\n| extend Account = InitiatingProcessAccountName, Computer = DeviceName, CommandLine = InitiatingProcessCommandLine, FileHash = InitiatingProcessSHA256, Image = InitiatingProcessFolderPath, AlertDetail = 'Dev-0322 IOC match'\n| extend timestamp = TimeGenerated, HostCustomEntity = Computer , AccountCustomEntity = Account, ProcessCustomEntity = InitiatingProcessFileName, FileHashCustomEntity = FileHash, IPCustomEntity = CommandLineIP\n),\n(DeviceProcessEvents\n| extend CommandLineIP = extract(IPRegex, 0,InitiatingProcessCommandLine)\n| where (InitiatingProcessFileName in (process) and InitiatingProcessParentFileName in (parentprocess))  or CommandLineIP in (IPList)\n| project TimeGenerated, ActionType, DeviceId, DeviceName, InitiatingProcessAccountDomain, InitiatingProcessAccountName, InitiatingProcessCommandLine, InitiatingProcessFolderPath, InitiatingProcessId, InitiatingProcessParentFileName, InitiatingProcessFileName,  InitiatingProcessSHA256, Type, CommandLineIP, AccountName\n| extend Account = AccountName, Computer = DeviceName, IPAddress = CommandLineIP, CommandLine = InitiatingProcessCommandLine, FileHash = InitiatingProcessSHA256, AlertDetail = 'Dev-0322 IOC match'\n| extend timestamp = TimeGenerated, HostCustomEntity = Computer , AccountCustomEntity = Account, ProcessCustomEntity = InitiatingProcessFileName, FileHashCustomEntity = FileHash, IPCustomEntity = IPAddress\n),\n(  SecurityEvent\n| where EventID == 4688\n| extend CommandLineIP = extract(IPRegex, 0, CommandLine)\n| where CommandLineIP in (IPList) or (NewProcessName  has_any (process) and ParentProcessName has_any (parentprocess))\n| project TimeGenerated, Computer, NewProcessName, ParentProcessName, Account, NewProcessId, Type, CommandLine, CommandLineIP\n| extend timestamp = TimeGenerated, HostCustomEntity = Computer , AccountCustomEntity = Account, ProcessCustomEntity = NewProcessName, AlertDetail = 'Dev-0322 IOC match', IPCustomEntity = CommandLineIP\n)\n)",
+                "queryFrequency": "PT6H",
+                "queryPeriod": "PT6H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "4759ddb4-2daf-43cb-b34e-d85b85b4e4a5",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Host"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPAddress"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Process",
+                        "fieldMappings": [
+                            {
+                                "identifier": "ProcessId",
+                                "columnName": "ProcessName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "FileHash",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Algorithm",
+                                "columnName": "SHA256"
+                            },
+                            {
+                                "identifier": "Value",
+                                "columnName": "SHA256"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

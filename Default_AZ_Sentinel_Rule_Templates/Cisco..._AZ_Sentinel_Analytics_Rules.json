@@ -1,0 +1,196 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/7c46b86e-ccc4-40b6-bf82-a3c7aaf3f42f')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/7c46b86e-ccc4-40b6-bf82-a3c7aaf3f42f')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Cisco - firewall block but success logon to Azure AD",
+                "description": "Correlate IPs blocked by a Cisco firewall appliance with successful Azure Active Directory signins. \nBecause the IP was blocked by the firewall, that same IP logging on successfully to AAD is potentially suspect\nand could indicate credential compromise for the user account.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let PrivateIPregex = @'^127\\.|^10\\.|^172\\.1[6-9]\\.|^172\\.2[0-9]\\.|^172\\.3[0-1]\\.|^192\\.168\\.';\nlet aadFunc = (tableName:string){\nCommonSecurityLog\n| where DeviceVendor =~ \"Cisco\"\n| where DeviceAction =~ \"denied\"\n| extend SourceIPType = iff(SourceIP matches regex PrivateIPregex,\"private\" ,\"public\" )\n| where SourceIPType == \"public\"\n| summarize count() by SourceIP\n| join (\n    // Successful signins from IPs blocked by the firewall solution are suspect\n    // Include fully successful sign-ins, but also ones that failed only at MFA stage\n    // as that supposes the password was sucessfully guessed.\n  table(tableName)\n  | where ResultType in (\"0\", \"50074\", \"50076\") \n) on $left.SourceIP == $right.IPAddress\n| extend timestamp = TimeGenerated, IPCustomEntity = SourceIP, AccountCustomEntity = UserPrincipalName\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "157c0cfc-d76d-463b-8755-c781608cdc1a",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/af262aed-567f-4df6-b277-59c3f006734a')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/af262aed-567f-4df6-b277-59c3f006734a')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Cisco ASA - average attack detection rate increase",
+                "description": "This will help you determine if Cisco ASA devices are under heavier attack than normal over the last hour versus the previous 6 hours based on DeviceEventClassID 733100\nReferences: https://www.cisco.com/c/en/us/td/docs/security/asa/syslog/b_syslog/syslogs9.html\nDetails on how to further troubleshoot/investigate: https://www.cisco.com/c/en/us/support/docs/security/asa-5500-x-series-next-generation-firewalls/113685-asa-threat-detection.html",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let timeframe = 1h;\nlet last1h = CommonSecurityLog \n| where TimeGenerated >= ago(timeframe)\n| where isempty(CommunicationDirection) \n| where DeviceEventClassID == \"733100\"\n| extend SourceOfDropRateCount = tostring(split(tostring(split(Message, \"]\")[0]),\"[ \")[1])\n| extend splitMessage = split(Message, \".\")\n| extend DropRate = tostring(split(tostring(splitMessage[0]),\"] \")[1])\n| extend CurrentBurstRate = split(tostring(split(tostring(splitMessage[1]),\"  \")[0]),\"is \")\n| extend CurrentBurstRatePerSec = toint(split(tostring(CurrentBurstRate[1]),\" \")[0])\n| extend MaxConfiguredBurstRate = toint(CurrentBurstRate[2])\n| extend CurrentAvgRate = split(tostring(split(tostring(splitMessage[1]),\"  \")[1]),\"is \")\n| extend CurrentAvgRatePerSec = toint(split(tostring(CurrentAvgRate[1]),\" \")[0])\n| extend MaxConfiguredAvgRate = toint(CurrentAvgRate[2])\n| extend CumulativeTotal = toint(split(tostring(split(tostring(splitMessage[1]),\"  \")[2]),\"is \")[1])\n| summarize last1hCumTotal = sum(CumulativeTotal), last1hAvgRatePerSec = avg(CurrentAvgRatePerSec), last1hAvgBurstRatePerSec = avg(CurrentBurstRatePerSec) by DeviceName, DeviceEventClassID, SourceIP, SourceOfDropRateCount, DropRate;\nlet prev6h = CommonSecurityLog \n| where TimeGenerated between (ago(6h) .. ago(1h))\n| where isempty(CommunicationDirection) \n| where DeviceEventClassID == \"733100\"\n| extend SourceOfDropRateCount = tostring(split(tostring(split(Message, \"]\")[0]),\"[ \")[1])\n| extend splitMessage = split(Message, \".\")\n| extend DropRate = tostring(split(tostring(splitMessage[0]),\"] \")[1])\n| extend CurrentBurstRate = split(tostring(split(tostring(splitMessage[1]),\"  \")[0]),\"is \")\n| extend prevCurrentBurstRatePerSec = toint(split(tostring(CurrentBurstRate[1]),\" \")[0])\n| extend prevMaxConfiguredBurstRate = toint(CurrentBurstRate[2])\n| extend CurrentAvgRate = split(tostring(split(tostring(splitMessage[1]),\"  \")[1]),\"is \")\n| extend prevCurrentAvgRatePerSec = toint(split(tostring(CurrentAvgRate[1]),\" \")[0])\n| extend prevMaxConfiguredAvgRate = toint(CurrentAvgRate[2])\n| extend prevCumulativeTotal = toint(split(tostring(split(tostring(splitMessage[1]),\"  \")[2]),\"is \")[1])\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), prev6hCumTotal = sum(prevCumulativeTotal), prev6hAvgRatePerSec = avg(prevCurrentAvgRatePerSec), prev6hAvgBurstRatePerSec = avg(prevCurrentBurstRatePerSec) \nby DeviceName, DeviceEventClassID, SourceIP, SourceOfDropRateCount, DropRate;\nlast1h | join (\n  prev6h \n) on DeviceName, DeviceEventClassID, SourceIP, SourceOfDropRateCount, DropRate\n| project StartTimeUtc, EndTimeUtc, DeviceName, DeviceEventClassID, SourceIP, SourceOfDropRateCount, DropRate, last1hCumTotal, prev6hCumTotal, prev6hAvgCumTotal = prev6hCumTotal/6, last1hAvgRatePerSec, prev6hAvgRatePerSec, last1hAvgBurstRatePerSec, prev6hAvgBurstRatePerSec\n// Select only events that indicate a doubling of the expected rate in the last hour over the previous 6 hours\n| where last1hCumTotal > 2*prev6hAvgCumTotal or last1hAvgRatePerSec > 2*prev6hAvgRatePerSec or last1hAvgBurstRatePerSec > 2*prev6hAvgBurstRatePerSec\n| extend timestamp = StartTimeUtc, IPCustomEntity = SourceIP, HostCustomEntity = DeviceName",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT6H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Discovery",
+                    "Impact"
+                ],
+                "alertRuleTemplateName": "79f29feb-6a9d-4cdf-baaa-2daf480a5da1",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/73d652a8-64c6-4d8c-ab17-b5371bc19836')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/73d652a8-64c6-4d8c-ab17-b5371bc19836')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Cisco ASA - threat detection message fired",
+                "description": "Identifies when the Cisco ASA Threat Detection engine fired an alert based on malicious activity occurring on the network inicated by DeviceEventClassID 733101-733105\nResources: https://www.cisco.com/c/en/us/td/docs/security/asa/syslog/b_syslog/syslogs9.html\nDetails on how to further troubleshoot/investigate: https://www.cisco.com/c/en/us/support/docs/security/asa-5500-x-series-next-generation-firewalls/113685-asa-threat-detection.html",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "CommonSecurityLog \n| where isempty(CommunicationDirection) \n| where DeviceEventClassID in (\"733101\",\"733102\",\"733103\",\"733104\",\"733105\")\n| extend timestamp = TimeGenerated, IPCustomEntity = SourceIP, HostCustomEntity = DeviceName",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Discovery",
+                    "Impact"
+                ],
+                "alertRuleTemplateName": "795edf2d-cf3e-45b5-8452-fe6c9e6a582e",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

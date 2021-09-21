@@ -1,0 +1,798 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e5db5d1c-9d8c-4c29-b051-b56adeb63ee9')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e5db5d1c-9d8c-4c29-b051-b56adeb63ee9')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps - New Extension Added",
+                "description": "Extensions added additional features to Azure DevOps. An attacker could use a malicious extension to conduct malicious activity. This query looks for new extensions that are not from a configurable list of approved publishers.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let allowed_publishers = dynamic([]);\nAzureDevOpsAuditing\n| where OperationName =~ \"Extension.Installed\"\n| extend ExtensionName = tostring(Data.ExtensionName)\n| extend PublisherName = tostring(Data.PublisherName)\n| where PublisherName !in (allowed_publishers)\n| project-reorder TimeGenerated, OperationName, ExtensionName, PublisherName, ActorUPN, IpAddress, UserAgent, ScopeDisplayName, Data\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "bf07ca9c-e408-443a-8939-6860a45a929e",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/7b1db6a3-1a8d-456a-8500-0ab83f592138')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/7b1db6a3-1a8d-456a-8500-0ab83f592138')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps - PAT used with Browser.",
+                "description": "Personal Access Tokens (PATs) are used as an alternate password to authenticate into Azure DevOps. PATs are intended for programmatic access for use in code or applications. Given this they can be prone to attacker theft if not adequately secured. This queries looks for the use of a PAT in authentication but from a User Agent indicating a browser. This should not be normal activity and could be an indicator of an attacker using a stolen PAT.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "AzureDevOpsAuditing\n| where AuthenticationMechanism startswith \"PAT\"\n// Look for useragents that include a redenring engine\n| where UserAgent has_any (\"Gecko\", \"WebKit\", \"Presto\", \"Trident\", \"EdgeHTML\", \"Blink\")\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "5f0d80db-3415-4265-9d52-8466b7372e3a",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/eb42db1a-36fa-42f8-a681-7feafb898655')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/eb42db1a-36fa-42f8-a681-7feafb898655')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps - Retention Reduced to Zero",
+                "description": "AzureDevOps retains items such as run records and produced artifacts for a configurable amount of time. An attacker looking to reduce the footprint left by their malicious activity may  look to reduce the retention time for artifacts and runs to 0.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "AzureDevOpsAuditing\n| where OperationName =~ \"Pipelines.PipelineRetentionSettingChanged\"\n| where Data.SettingName in (\"PurgeArtifacts\", \"PurgeRuns\")\n| where Data.NewValue == 0\n| project-reorder TimeGenerated, OperationName, ActorUPN, IpAddress, UserAgent, Data\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "DefenseEvasion"
+                ],
+                "alertRuleTemplateName": "71d374e0-1cf8-4e50-aecd-ab6c519795c2",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/47206323-6f6e-49a1-af76-d2caee0dcc50')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/47206323-6f6e-49a1-af76-d2caee0dcc50')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps - Variable Secret Not Secured",
+                "description": "Credentials used in the build process may be stored as Azure DevOps variables. To secure these variables they should be stored in KeyVault or marked as secrets. This detection looks for new variables added with names that suggest they are credentials but where they are not set as Secrets or stored in KeyVault.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let keywords = dynamic([\"secret\", \"secrets\", \"password\", \"PAT\", \"passwd\", \"pswd\", \"pwd\", \"cred\", \"creds\", \"credentials\", \"credential\", \"key\"]);\nAzureDevOpsAuditing\n| where OperationName =~ \"Library.VariableGroupModified\"\n| extend Type = tostring(Data.Type)\n| extend VariableGroupId = tostring(Data.VariableGroupId)\n| extend VariableGroupName = tostring(Data.VariableGroupName)\n| mv-expand Data.Variables\n| where VariableGroupName has_any (keywords) or Data_Variables has_any (keywords)\n| where Type != \"AzureKeyVault\"\n| where Data_Variables !has \"IsSecret\"\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "4ca74dc0-8352-4ac5-893c-73571cc78331",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/06e11dad-7733-4e3f-a60b-64d52290001f')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/06e11dad-7733-4e3f-a60b-64d52290001f')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps Administrator Group Monitoring",
+                "description": "This detection monitors for additions to project or project collection administration groups in an Azure DevOps Organization.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "// Change to true to monitor for Project Administrator adds to *any* project\nlet MonitorAllProjects = false;\n// If MonitorAllProjects is false, trigger only on Project Administrator add for the following projects\nlet ProjectsToMonitor = dynamic(['<project_X>','<project_Y>']);\nAzureDevOpsAuditing\n| where Area == \"Group\" and OperationName == \"Group.UpdateGroupMembership.Add\"\n| where Details has 'Administrators'\n| where Details has \"was added as a member of group\" and (Details endswith '\\\\Project Administrators' or Details endswith '\\\\Project Collection Administrators')\n| parse Details with AddedIdentity ' was added as a member of group [' EntityName ']\\\\' GroupName\n| extend Level = iif(GroupName == 'Project Collection Administrators', 'Organization', 'Project'), AddedIdentityId = Data.MemberId\n| extend Severity = iif(Level == 'Organization', 'High', 'Medium'), AlertDetails = strcat('At ', TimeGenerated, ' UTC ', ActorUPN, '/', ActorDisplayName, ' added ', AddedIdentity, ' to the ', EntityName, ' ', Level)\n| where MonitorAllProjects == true or EntityName in (ProjectsToMonitor) or Level == 'Organization'\n| project TimeGenerated, Severity, Adder = ActorUPN, AddedIdentity, AddedIdentityId, AlertDetails, Level, EntityName, GroupName, ActorAuthType = AuthenticationMechanism, \n  ActorIpAddress = IpAddress, ActorUserAgent = UserAgent, RawDetails = Details\n| extend timestamp = TimeGenerated, AccountCustomEntity = Adder, IPCustomEntity = ActorIpAddress",
+                "queryFrequency": "PT4H",
+                "queryPeriod": "PT4H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "89e6adbd-612c-4fbe-bc3d-32f81baf3b6c",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/db398bc6-1417-4c98-812c-f823d4d92aae')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/db398bc6-1417-4c98-812c-f823d4d92aae')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps Agent Pool Created Then Deleted",
+                "description": "As well as adding build agents to an existing pool to execute malicious activity within a pipeline an attacker could create a complete new agent pool and use this for execution. Azure DevOps allows for the creation of agent pools with Azure hosted infrastructure or self-hosted infrastructure. Given the additional customizability of self-hosted agents this detection focuses on the creation of new self-hosted pools. To further reduce false positive rates the detection looks for pools created and deleted relatively quickly (within 7 days by default), as an attacker is likely to remove a malicious pool once used in order to reduce/remove evidence of their activity.",
+                "severity": "High",
+                "enabled": true,
+                "query": "let lookback = 14d;\nlet timewindow = 7d;\nAzureDevOpsAuditing\n| where TimeGenerated > ago(lookback)\n| where OperationName =~ \"Library.AgentPoolCreated\"\n| extend AgentCloudId = tostring(Data.AgentCloudId)\n| extend PoolType = iif(isnotempty(AgentCloudId), \"Azure VMs\", \"Self Hosted\")\n// Comment this line out to include cloud pools as well\n| where PoolType == \"Self Hosted\"\n| extend AgentPoolName = tostring(Data.AgentPoolName)\n| extend AgentPoolId = tostring(Data.AgentPoolId)\n| extend IsHosted = tostring(Data.IsHosted)\n| extend IsLegacy = tostring(Data.IsLegacy)\n| extend timekey = bin(TimeGenerated, timewindow)\n// Join only with pools deleted in the same window\n| join (AzureDevOpsAuditing\n| where TimeGenerated > ago(lookback)\n| where OperationName =~ \"Library.AgentPoolDeleted\"\n| extend AgentPoolName = tostring(Data.AgentPoolName)\n| extend AgentPoolId = tostring(Data.AgentPoolId)\n| extend timekey = bin(TimeGenerated, timewindow)) on AgentPoolId, timekey\n| project-reorder TimeGenerated, ActorUPN, UserAgent, IpAddress, AuthenticationMechanism, OperationName, AgentPoolName, IsHosted, IsLegacy, Data\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress",
+                "queryFrequency": "P7D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "DefenseEvasion"
+                ],
+                "alertRuleTemplateName": "acfdee3f-b794-404a-aeba-ef6a1fa08ad1",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/04c2e200-4667-4050-ae43-8e97e5a83a77')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/04c2e200-4667-4050-ae43-8e97e5a83a77')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps Audit Stream Disabled",
+                "description": "Azure DevOps allow for audit logs to streamed to external storage solutions such as SIEM solutions. An attacker looking to hide malicious Azure DevOps activity from defenders may look to disable data streams before conducting activity and them re-enabling them after (so as not to raise data threshold-based alarms). Looking for disabled audit streams can identify this activity, and due to the nature of the action its unlikely to have a high false positive rate.",
+                "severity": "High",
+                "enabled": true,
+                "query": "AzureDevOpsAuditing\n| where OperationName =~ \"AuditLog.StreamDisabledByUser\"\n| extend StreamType = tostring(Data.ConsumerType)\n| project-reorder TimeGenerated, Details, ActorUPN, IpAddress, UserAgent, StreamType\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "DefenseEvasion"
+                ],
+                "alertRuleTemplateName": "4e8238bd-ff4f-4126-a9f6-09b3b6801b3d",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/9183e6d8-d674-4223-8b5e-17794ea0d3a5')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/9183e6d8-d674-4223-8b5e-17794ea0d3a5')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps Personal Access Token (PAT) misuse",
+                "description": "This Alert detects whenever a PAT is used in ways that PATs are not normally used.  May require Allowlisting and baselining.\nReference - https://docs.microsoft.com/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=preview-page\nUse this query for baselining:\nAzureDevOpsAuditing\n| distinct OperationName",
+                "severity": "High",
+                "enabled": true,
+                "query": "// Allowlisted UPNs should likely stay empty\nlet AllowlistedUpns = datatable(UPN:string)['foo@bar.com', 'test@foo.com'];\n// Operation Name parts that will alert\nlet HasAnyBlocklist = datatable(OperationNamePart:string)['Security.','Project.','AuditLog.','Extension.'];\n// Distinct Operation Names that will flag\nlet HasExactBlocklist = datatable(OperationName:string)['Group.UpdateGroupMembership.Add','Library.ServiceConnectionExecuted','Pipelines.PipelineModified',\n'Release.ReleasePipelineModified', 'Git.RefUpdatePoliciesBypassed'];\nAzureDevOpsAuditing\n| where AuthenticationMechanism startswith \"PAT\" and (OperationName has_any (HasAnyBlocklist) or OperationName in (HasExactBlocklist))\n  and ActorUPN !in (AllowlistedUpns)\n| project TimeGenerated, AuthenticationMechanism, ProjectName, ActorUPN, ActorDisplayName, IpAddress, UserAgent, OperationName, Details, Data\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Execution",
+                    "Impact"
+                ],
+                "alertRuleTemplateName": "ac891683-53c3-4f86-86b4-c361708e2b2b",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/0dc5d2ae-19bb-4e5f-8d24-9fd92669f5c7')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/0dc5d2ae-19bb-4e5f-8d24-9fd92669f5c7')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps Pipeline Created and Deleted on the Same Day",
+                "description": "An attacker with access to Azure DevOps could create a pipeline to inject artifacts used by other pipelines, \nor to create a malicious software build that looks legitimate by using a pipeline that incorporates legitimate elements. \nAn attacker would also likely want to cover their tracks once conducting such activity. This query looks for Pipelines \ncreated and deleted within the same day, this is unlikely to be legitimate user activity in the majority of cases.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let timeframe = 3d;\n// Get Release Pipeline Creation Events and group by day\nAzureDevOpsAuditing\n| where TimeGenerated > ago(timeframe)\n| where OperationName =~ \"Release.ReleasePipelineCreated\"\n// Group by day\n| extend timekey = bin(TimeGenerated, 1d)\n| extend PipelineId = tostring(Data.PipelineId)\n| extend PipelineName = tostring(Data.PipelineName)\n// Rename some columns to make output clearer\n| project-rename TimeCreated = TimeGenerated, CreatingUser = ActorUPN, CreatingUserAgent = UserAgent, CreatingIP = IpAddress\n// Join with Release Pipeline Deletions where Pipeline ID is the same and deletion occurred on same day as creation\n| join (AzureDevOpsAuditing\n| where TimeGenerated > ago(timeframe)\n| where OperationName =~ \"Release.ReleasePipelineDeleted\"\n// Group by day\n| extend timekey = bin(TimeGenerated, 1d)\n| extend PipelineId = tostring(Data.PipelineId)\n| extend PipelineName = tostring(Data.PipelineName)\n// Rename some things to make the output clearer\n| project-rename TimeDeleted = TimeGenerated, DeletingUser = ActorUPN, DeletingUserAgent = UserAgent, DeletingIP = IpAddress) on PipelineId, timekey\n| project TimeCreated, TimeDeleted, PipelineName, PipelineId, CreatingUser, CreatingIP, CreatingUserAgent, DeletingUser, DeletingIP, DeletingUserAgent, ScopeDisplayName, ProjectName, Data, OperationName, OperationName1\n| extend timestamp = TimeCreated, AccountCustomEntity = CreatingUser, IPCustomEntity = CreatingIP",
+                "queryFrequency": "P3D",
+                "queryPeriod": "P3D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Execution"
+                ],
+                "alertRuleTemplateName": "17f23fbe-bb73-4324-8ecf-a18545a5dc26",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "DeletingUser"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "DeletingIP"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/02974e2c-1dc4-4201-aba9-ea226468240d')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/02974e2c-1dc4-4201-aba9-ea226468240d')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps Pipleine modified by a New User.",
+                "description": "There are several potential pipeline steps that could be modified by an attacker to inject malicious code into the build cycle. A likely attacker path is the modification to an existing pipeline that they have access to. This detection looks for users modifying a pipeline when they have not previously been observed modifying or creating that pipeline before. This query also joins events with data to Azure AD Identity Protection (AAD IdP) in order to show if the user conducting the action has any associated AAD IdP  alerts, you can also chose to filter this detection to only alert when the user also has AAD IdP alerts associated with them.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "// Set the lookback to determine if user has created pipelines before\nlet timeback = 14d;\n// Set the period for detections\nlet timeframe = 1d;\n// Get a list of previous Release Pipeline creators to exclude\nlet releaseusers = AzureDevOpsAuditing\n| where TimeGenerated > ago(timeback) and TimeGenerated < ago(timeframe)\n| where OperationName in (\"Release.ReleasePipelineCreated\", \"Release.ReleasePipelineModified\")\n// We want to look for users performing actions in specific projects so we create this userscope object to match on\n| extend UserScope = strcat(ActorUserId, \"-\", ProjectName)\n| summarize by UserScope;\n// Get Release Pipeline creations by new users\nAzureDevOpsAuditing\n| where TimeGenerated > ago(timeframe)\n| where OperationName =~ \"Release.ReleasePipelineModified\"\n| extend UserScope = strcat(ActorUserId, \"-\", ProjectName)\n| where UserScope !in (releaseusers)\n| extend ActorUPN = tolower(ActorUPN)\n| project-away Id, ActivityId, ActorCUID, ScopeId, ProjectId, TenantId, SourceSystem, UserScope\n// See if any of these users have Azure AD alerts associated with them in the same timeframe\n| join kind = leftouter (\nSecurityAlert\n| where TimeGenerated > ago(timeframe)\n| where ProviderName == \"IPC\"\n| extend AadUserId = tostring(parse_json(Entities)[0].AadUserId)\n| summarize Alerts=count() by AadUserId) on $left.ActorUserId == $right.AadUserId\n| extend Alerts = iif(isnotempty(Alerts), Alerts, 0)\n// Uncomment the line below to only show results where the user as AADIdP alerts\n//| where Alerts > 0\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Execution",
+                    "DefenseEvasion"
+                ],
+                "alertRuleTemplateName": "155e9134-d5ad-4a6f-88f3-99c220040b66",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e1bd9316-3905-4557-a548-ef88b7e347c8')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e1bd9316-3905-4557-a548-ef88b7e347c8')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps Pull Request Policy Bypassing - Historic Allowlist",
+                "description": "This detection builds a Allowlist of historic PR policy bypasses and compares to recent history, flagging a non manually allowlisted, non historic pull request bypass.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let starttime = 14d;\nlet endtime = 3h;\n// Add full UPN (user@domain.com) to Authorized Bypassers to ignore policy bypasses by certain authorized users\nlet AuthorizedBypassers = dynamic(['foo@baz.com', 'test@foo.com']);\nlet historicBypassers = AzureDevOpsAuditing\n| where TimeGenerated between (ago(starttime) .. ago(endtime))\n| where OperationName == 'Git.RefUpdatePoliciesBypassed'\n| distinct ActorUPN;\nAzureDevOpsAuditing\n| where TimeGenerated >= ago(endtime)\n| where OperationName == 'Git.RefUpdatePoliciesBypassed'\n| where ActorUPN !in (historicBypassers) and ActorUPN !in (AuthorizedBypassers)\n| parse ScopeDisplayName with OrganizationName '(Organization)'\n| project TimeGenerated, ActorUPN, IpAddress, UserAgent, OrganizationName, ProjectName, RepoName = Data.RepoName, AlertDetails = Details, Branch = Data.Name, \n  BypassReason = Data.BypassReason, PRLink = strcat('https://dev.azure.com/', OrganizationName, '/', ProjectName, '/_git/', Data.RepoName, '/pullrequest/', Data.PullRequestId)\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress",
+                "queryFrequency": "PT3H",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "4d8de9e6-263e-4845-8618-cd23a4f58b70",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8afd08d4-7d2e-4198-a9b8-1d1977052598')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8afd08d4-7d2e-4198-a9b8-1d1977052598')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps Service Conection Abuse",
+                "description": "Flags builds/releases that use a large number of service connections if they aren't manually allowlisted.\nThis is to determine if someone is hijacking a build/release and adding many service connections in order to abuse \nor dump credentials from service connections.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "// How many greater than Service Connections you want to view per build/release\nlet ServiceConnectionThreshold = 4;\nlet BypassDefIds = datatable(DefId:string, Type:string, ProjectName:string)\n[\n//\"103\", \"Release\", \"ProjectA\",\n//\"42\", \"Release\", \"ProjectB\",\n//\"122\", \"Build\", \"ProjectB\"\n];\nAzureDevOpsAuditing\n| where OperationName == \"Library.ServiceConnectionExecuted\" \n| extend DefId = tostring(Data.DefinitionId), Type = tostring(Data.PlanType), ConnectionId = tostring(Data.ConnectionId)\n| parse ScopeDisplayName with OrganizationName ' (Organization)'\n| summarize CurrentCount = dcount(tostring(ConnectionId)), ConnectionNames = make_set(tostring(Data.ConnectionName)), StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) \n  by OrganizationName, tostring(DefId), tostring(Type), ProjectId, ProjectName\n| where CurrentCount > ServiceConnectionThreshold\n| join kind=anti BypassDefIds on $left.DefId==$right.DefId and $left.Type == $right.Type and $left.ProjectName == $right.ProjectName\n| extend link = iif(\n  Type == \"Build\", strcat('https://dev.azure.com/', OrganizationName, '/', ProjectName, '/_build?definitionId=', DefId),\n  strcat('https://dev.azure.com/', OrganizationName, '/', ProjectName, '/_release?_a=releases&view=mine&definitionId=', DefId))\n| extend timestamp = StartTime",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "Impact"
+                ],
+                "alertRuleTemplateName": "d564ff12-8f53-41b8-8649-44f76b37b99f",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": null
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/66ff1894-c449-4f37-bdfd-3909d2ef7825')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/66ff1894-c449-4f37-bdfd-3909d2ef7825')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Azure DevOps Service Conection Addition/Abuse - Historic Allowlist",
+                "description": "This detection builds a allowlist of historic service connection use by Builds and Releases and compares to recent history, flagging growth of service connection use in non manually allowlisted, non historically allowlisted Build/Release runs.\nThis is to determine if someone is hijacking a build/release and adding many service connections in order to abuse or dump credentials from service connections.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let starttime = 14d;\nlet endtime = 6h;\n// Ignore Build/Releases with less/equal this number\nlet ServiceConnectionThreshold = 3;\n// New Connections need to exhibit execution of more \"new\" connections than this number.\nlet NewConnectionThreshold = 1;\n// List of Builds/Releases to ignore in your space\nlet BypassDefIds = datatable(DefId:string, Type:string, ProjectName:string)\n[\n//\"103\", \"Release\", \"ProjectA\",\n//\"42\", \"Release\", \"ProjectB\",\n//\"122\", \"Build\", \"ProjectB\"\n];\nlet HistoricDefs = AzureDevOpsAuditing\n| where TimeGenerated between (ago(starttime) .. ago(endtime))\n| where OperationName == \"Library.ServiceConnectionExecuted\" \n| extend DefId = tostring(Data.DefinitionId), Type = tostring(Data.PlanType), ConnectionId = tostring(Data.ConnectionId)\n| summarize HistoricCount = dcount(tostring(ConnectionId)), ConnectionNames = make_set(tostring(Data.ConnectionName)) \n  by DefId = tostring(DefId), Type = tostring(Type), ProjectId, ProjectName, ActorUPN;\nAzureDevOpsAuditing\n| where TimeGenerated >= ago(endtime)\n| where OperationName == \"Library.ServiceConnectionExecuted\" \n| extend DefId = tostring(Data.DefinitionId), Type = tostring(Data.PlanType), ConnectionId = tostring(Data.ConnectionId)\n| parse ScopeDisplayName with OrganizationName ' (Organization)'\n| summarize CurrentCount = dcount(tostring(ConnectionId)), ConnectionNames = make_set(tostring(Data.ConnectionName)), StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) \n  by OrganizationName, DefId = tostring(DefId), Type = tostring(Type), ProjectId, ProjectName, ActorUPN\n| where CurrentCount > ServiceConnectionThreshold\n| join (HistoricDefs) on ProjectId, DefId, Type, ActorUPN\n| join kind=anti BypassDefIds on $left.DefId==$right.DefId and $left.Type == $right.Type and $left.ProjectName == $right.ProjectName\n| extend link = iff(\nType == \"Build\", strcat('https://dev.azure.com/', OrganizationName, '/', ProjectName, '/_build?definitionId=', DefId),\nstrcat('https://dev.azure.com/', OrganizationName, '/', ProjectName, '/_release?_a=releases&view=mine&definitionId=', DefId))\n| where CurrentCount >= HistoricCount + NewConnectionThreshold\n| project StartTime, OrganizationName, ProjectName, DefId, link, RecentDistinctServiceConnections = CurrentCount, HistoricDistinctServiceConnections = HistoricCount, \n  RecentConnections = ConnectionNames, HistoricConnections = ConnectionNames1, ActorUPN\n| extend timestamp = StartTime, AccountCustomEntity = ActorUPN",
+                "queryFrequency": "PT6H",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "Impact"
+                ],
+                "alertRuleTemplateName": "5efb0cfd-063d-417a-803b-562eae5b0301",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

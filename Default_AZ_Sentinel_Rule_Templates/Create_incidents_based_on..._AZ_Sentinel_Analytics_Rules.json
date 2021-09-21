@@ -1,0 +1,134 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/88d8d089-3ed0-4d5a-b811-ad78fb485e8c')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/88d8d089-3ed0-4d5a-b811-ad78fb485e8c')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "MicrosoftSecurityIncidentCreation",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Create incidents based on Azure Active Directory Identity Protection alerts",
+                "description": "Create incidents based on all alerts generated in Azure Active Directory Identity Protection",
+                "enabled": true,
+                "productFilter": "Azure Active Directory Identity Protection",
+                "severitiesFilter": null,
+                "displayNamesFilter": null,
+                "displayNamesExcludeFilter": null,
+                "alertRuleTemplateName": "532c1811-79ee-4d9f-8d4d-6304c840daa1"
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/4e7698fb-e049-44ba-b646-2c7a1cdd09b7')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/4e7698fb-e049-44ba-b646-2c7a1cdd09b7')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "MicrosoftSecurityIncidentCreation",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Create incidents based on Azure Defender alerts",
+                "description": "Create incidents based on all alerts generated in Azure Defender",
+                "enabled": true,
+                "productFilter": "Azure Security Center",
+                "severitiesFilter": [
+                    "Low",
+                    "Medium",
+                    "High"
+                ],
+                "displayNamesFilter": null,
+                "displayNamesExcludeFilter": null,
+                "alertRuleTemplateName": "90586451-7ba8-4c1e-9904-7d1b7c3cc4d6"
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/047ba807-0638-4a03-ba18-e56ca0f45b4a')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/047ba807-0638-4a03-ba18-e56ca0f45b4a')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "MicrosoftSecurityIncidentCreation",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Create incidents based on Azure Defender for IOT alerts",
+                "description": "Create incidents based on all alerts generated in Azure Defender for IOT",
+                "enabled": true,
+                "productFilter": "Azure Security Center for IoT",
+                "severitiesFilter": null,
+                "displayNamesFilter": null,
+                "displayNamesExcludeFilter": null,
+                "alertRuleTemplateName": "a2e0eb51-1f11-461a-999b-cd0ebe5c7a72"
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/ee4d6fef-b9dc-4e07-b222-ee83d10d332c')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/ee4d6fef-b9dc-4e07-b222-ee83d10d332c')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "MicrosoftSecurityIncidentCreation",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Create incidents based on Microsoft Cloud App Security alerts",
+                "description": "Create incidents based on all alerts generated in Microsoft Cloud App Security",
+                "enabled": true,
+                "productFilter": "Microsoft Cloud App Security",
+                "severitiesFilter": null,
+                "displayNamesFilter": null,
+                "displayNamesExcludeFilter": null,
+                "alertRuleTemplateName": "b3cfc7c0-092c-481c-a55b-34a3979758cb"
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/31add0a5-7489-47a8-8b0f-84a2e4b116d8')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/31add0a5-7489-47a8-8b0f-84a2e4b116d8')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "MicrosoftSecurityIncidentCreation",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Create incidents based on Microsoft Defender for Endpoint alerts",
+                "description": "Create incidents based on all alerts generated in Microsoft Defender for Endpoint",
+                "enabled": true,
+                "productFilter": "Microsoft Defender Advanced Threat Protection",
+                "severitiesFilter": null,
+                "displayNamesFilter": null,
+                "displayNamesExcludeFilter": null,
+                "alertRuleTemplateName": "327cd4ed-ca42-454b-887c-54e1c91363c6"
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8003920f-087d-4a39-9d3e-1f48d428f258')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8003920f-087d-4a39-9d3e-1f48d428f258')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "MicrosoftSecurityIncidentCreation",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Create incidents based on Microsoft Defender for Identity alerts",
+                "description": "Create incidents based on all alerts generated in Microsoft Defender for Identity",
+                "enabled": true,
+                "productFilter": "Azure Advanced Threat Protection",
+                "severitiesFilter": null,
+                "displayNamesFilter": null,
+                "displayNamesExcludeFilter": null,
+                "alertRuleTemplateName": "40ba9493-4183-4eee-974f-87fe39c8f267"
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/21a93a33-5438-4afe-a3f7-ec8af4c1892c')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/21a93a33-5438-4afe-a3f7-ec8af4c1892c')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "MicrosoftSecurityIncidentCreation",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Create incidents based on Microsoft Defender for Office 365 alerts",
+                "description": "Create incidents based on all alerts generated in Microsoft Defender for Office 365",
+                "enabled": true,
+                "productFilter": "Office 365 Advanced Threat Protection",
+                "severitiesFilter": null,
+                "displayNamesFilter": null,
+                "displayNamesExcludeFilter": null,
+                "alertRuleTemplateName": "ee1d718b-9ed9-4a71-90cd-a483a4f008df"
+            }
+        }
+    ]
+}

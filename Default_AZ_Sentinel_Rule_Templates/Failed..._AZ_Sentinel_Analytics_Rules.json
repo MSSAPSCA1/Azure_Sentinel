@@ -1,0 +1,336 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/20105979-44d4-40d8-a422-f375c5fcbb7a')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/20105979-44d4-40d8-a422-f375c5fcbb7a')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Failed AzureAD logons but success logon to host",
+                "description": "Identifies a list of IP addresses with a minimum number (default of 5) of failed logon attempts to Azure Active Directory.\nUses that list to identify any successful remote logons to hosts from these IPs within the same timeframe.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "//Adjust this threshold to fit the environment\nlet signin_threshold = 5;\n//Make a list of all IPs with failed signins to AAD above our threshold\nlet aadFunc = (tableName:string){\nlet suspicious_signins =\ntable(tableName)\n| where ResultType !in (\"0\", \"50125\", \"50140\")\n| where IPAddress !in ('127.0.0.1', '::1')\n| summarize count() by IPAddress\n| where count_ > signin_threshold\n| summarize make_set(IPAddress);\n//See if any of these IPs have sucessfully logged into *nix hosts\nlet linux_logons =\nSyslog\n| where Facility contains \"auth\" and ProcessName != \"sudo\"\n| where SyslogMessage has \"Accepted\"\n| extend SourceIP = extract(\"(([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.(([0-9]{1,3})))\",1,SyslogMessage)\n| where SourceIP in (suspicious_signins)\n| extend Reason = \"Multiple failed AAD logins from IP address\"\n| project TimeGenerated, Computer, HostIP, IpAddress = SourceIP, SyslogMessage, Facility, ProcessName, Reason;\n//See if any of these IPs have sucessfully logged into Windows hosts\nlet win_logons =\nSecurityEvent\n| where EventID == 4624\n| where LogonType in (10, 7, 3)\n| where IpAddress != \"-\"\n| where IpAddress in (suspicious_signins)\n| extend Reason = \"Multiple failed AAD logins from IP address\"\n| project TimeGenerated, Account, AccountType, Computer, Activity, EventID, LogonProcessName, IpAddress, LogonTypeName, TargetUserSid, Reason;\nunion isfuzzy=true linux_logons,win_logons\n| extend timestamp = TimeGenerated\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess",
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "8ee967a2-a645-4832-85f4-72b635bcb3a6",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Account"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Computer"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IpAddress"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/95b82438-68f7-477f-8e8d-b54d029a3e8a')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/95b82438-68f7-477f-8e8d-b54d029a3e8a')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Failed host logons but success logon to AzureAD",
+                "description": "Identifies a list of IP addresses with a minimum number(default of 5) of failed logon attempts to remote hosts.\nUses that list to identify any successful logons to Azure Active Directory from these IPs within the same timeframe.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "//Adjust this threshold to fit environment\nlet signin_threshold = 5; \n//Make a list of IPs with failed Windows host logins above threshold\nlet win_fails = \nSecurityEvent\n| where EventID == 4625\n| where LogonType in (10, 7, 3)\n| where IpAddress != \"-\"\n| summarize count() by IpAddress\n| where count_ > signin_threshold\n| summarize make_list(IpAddress);\n//Make a list of IPs with failed *nix host logins above threshold\nlet nix_fails = \nSyslog\n| where Facility contains 'auth' and ProcessName != 'sudo'\n| extend SourceIP = extract(\"(([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.(([0-9]{1,3})))\",1,SyslogMessage)\n| where SourceIP != \"\" and SourceIP != \"127.0.0.1\"\n| summarize count() by SourceIP\n| where count_ > signin_threshold\n| summarize make_list(SourceIP);\n//See if any of the IPs with failed host logins hve had a sucessful Azure AD login\nlet aadFunc = (tableName:string){\ntable(tableName)\n| where ResultType !in (\"0\", \"50125\", \"50140\")\n| where IPAddress in (win_fails) or IPAddress in (nix_fails)\n| extend Reason=  \"Multiple failed host logins from IP address with successful Azure AD login\"\n| extend timstamp = TimeGenerated,Type = Type\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess",
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "1ce5e766-26ab-4616-b7c8-3b33ae321e80",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "UserPrincipalName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPAddress"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/d9f7bbe2-0bc0-453a-880e-276b465f8617')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/d9f7bbe2-0bc0-453a-880e-276b465f8617')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Failed login attempts to Azure Portal",
+                "description": "Identifies failed login attempts in the Azure Active Directory SigninLogs to the Azure Portal.  Many failed logon \nattempts or some failed logon attempts from multiple IPs could indicate a potential brute force attack.  \nThe following are excluded due to success and non-failure results:\nReferences: https://docs.microsoft.com/azure/active-directory/reports-monitoring/reference-sign-ins-error-codes\n0 - successful logon\n50125 - Sign-in was interrupted due to a password reset or password registration entry.\n50140 - This error occurred due to 'Keep me signed in' interrupt when the user was signing-in.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let timeRange = 1d;\nlet lookBack = 7d;\nlet threshold_Failed = 5;\nlet threshold_FailedwithSingleIP = 20;\nlet threshold_IPAddressCount = 2;\nlet isGUID = \"[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12}\";\nlet aadFunc = (tableName:string){\nlet azPortalSignins = materialize(table(tableName)\n| where TimeGenerated >= ago(lookBack)\n// Azure Portal only\n| where AppDisplayName =~ \"Azure Portal\")\n;\nlet successPortalSignins = azPortalSignins\n| where TimeGenerated >= ago(timeRange)\n// Azure Portal only and exclude non-failure Result Types\n| where ResultType in (\"0\", \"50125\", \"50140\")\n// Tagging identities not resolved to friendly names\n//| extend Unresolved = iff(Identity matches regex isGUID, true, false)\n| distinct TimeGenerated, UserPrincipalName, Id, ResultType\n;\nlet failPortalSignins = azPortalSignins\n| where TimeGenerated >= ago(timeRange)\n// Azure Portal only and exclude non-failure Result Types\n| where ResultType !in (\"0\", \"50125\", \"50140\")\n// Tagging identities not resolved to friendly names\n| extend Unresolved = iff(Identity matches regex isGUID, true, false)\n;\n// Verify there is no success for the same connection attempt after the fail\nlet failnoSuccess = failPortalSignins | join kind= leftouter (\n   successPortalSignins \n) on UserPrincipalName, Id\n| where TimeGenerated > TimeGenerated1\n| project-away TimeGenerated1, UserPrincipalName1, Id1, ResultType1\n;\n// Lookup up resolved identities from last 7 days\nlet identityLookup = azPortalSignins\n| where TimeGenerated >= ago(lookBack)\n| where not(Identity matches regex isGUID)\n| summarize by UserId, lu_UserDisplayName = UserDisplayName, lu_UserPrincipalName = UserPrincipalName;\n// Join resolved names to unresolved list from portal signins\nlet unresolvedNames = failnoSuccess | where Unresolved == true | join kind= inner (\n   identityLookup \n) on UserId\n| extend UserDisplayName = lu_UserDisplayName, UserPrincipalName = lu_UserPrincipalName\n| project-away lu_UserDisplayName, lu_UserPrincipalName;\n// Join Signins that had resolved names with list of unresolved that now have a resolved name\nlet u_azPortalSignins = failnoSuccess | where Unresolved == false | union unresolvedNames;\nu_azPortalSignins\n| extend DeviceDetail = todynamic(DeviceDetail), Status = todynamic(DeviceDetail), LocationDetails = todynamic(LocationDetails)\n| extend Status = strcat(ResultType, \": \", ResultDescription), OS = tostring(DeviceDetail.operatingSystem), Browser = tostring(DeviceDetail.browser)\n| extend State = tostring(LocationDetails.state), City = tostring(LocationDetails.city), Region = tostring(LocationDetails.countryOrRegion)\n| extend FullLocation = strcat(Region,'|', State, '|', City)\n| summarize TimeGenerated = makelist(TimeGenerated), Status = makelist(Status), IPAddresses = makelist(IPAddress), IPAddressCount = dcount(IPAddress), FailedLogonCount = count()\nby UserPrincipalName, UserId, UserDisplayName, AppDisplayName, Browser, OS, FullLocation, Type\n| mvexpand TimeGenerated, IPAddresses, Status\n| extend TimeGenerated = todatetime(tostring(TimeGenerated)), IPAddress = tostring(IPAddresses), Status = tostring(Status)\n| project-away IPAddresses\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by UserPrincipalName, UserId, UserDisplayName, Status, FailedLogonCount, IPAddress, IPAddressCount, AppDisplayName, Browser, OS, FullLocation, Type\n| where (IPAddressCount >= threshold_IPAddressCount and FailedLogonCount >= threshold_Failed) or FailedLogonCount >= threshold_FailedwithSingleIP\n| extend timestamp = StartTime\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P7D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "223db5c1-1bf8-47d8-8806-bed401b356a4",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "UserPrincipalName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPAddress"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/bd4a0001-a6dc-4710-9c31-74ca773f179f')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/bd4a0001-a6dc-4710-9c31-74ca773f179f')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Failed logon attempts by valid accounts within 10 mins",
+                "description": "Identifies when failed logon attempts are 20 or higher during a 10 minute period (2 failed logons per minute minimum) from valid account.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let threshold = 20;\nSecurityEvent \n| where EventID == 4625\n| where AccountType =~ \"User\"\n| where SubStatus !='0xc0000064' and Account !in ('\\\\', '-\\\\-')\n// SubStatus '0xc0000064' signifies 'Account name does not exist'\n| extend ResourceId = column_ifexists(\"_ResourceId\", _ResourceId), SourceComputerId = column_ifexists(\"SourceComputerId\", SourceComputerId)\n| extend Reason = case(\nSubStatus =~ '0xC000005E', 'There are currently no logon servers available to service the logon request.',\nSubStatus =~ '0xC0000064', 'User logon with misspelled or bad user account',\nSubStatus =~ '0xC000006A', 'User logon with misspelled or bad password', \nSubStatus =~ '0xC000006D', 'Bad user name or password',\nSubStatus =~ '0xC000006E', 'Unknown user name or bad password',\nSubStatus =~ '0xC000006F', 'User logon outside authorized hours',\nSubStatus =~ '0xC0000070', 'User logon from unauthorized workstation',\nSubStatus =~ '0xC0000071', 'User logon with expired password',\nSubStatus =~ '0xC0000072', 'User logon to account disabled by administrator',\nSubStatus =~ '0xC00000DC', 'Indicates the Sam Server was in the wrong state to perform the desired operation', \nSubStatus =~ '0xC0000133', 'Clocks between DC and other computer too far out of sync',\nSubStatus =~ '0xC000015B', 'The user has not been granted the requested logon type (aka logon right) at this machine',\nSubStatus =~ '0xC000018C', 'The logon request failed because the trust relationship between the primary domain and the trusted domain failed',\nSubStatus =~ '0xC0000192', 'An attempt was made to logon, but the Netlogon service was not started',\nSubStatus =~ '0xC0000193', 'User logon with expired account',\nSubStatus =~ '0xC0000224', 'User is required to change password at next logon',\nSubStatus =~ '0xC0000225', 'Evidently a bug in Windows and not a risk',\nSubStatus =~ '0xC0000234', 'User logon with account locked',\nSubStatus =~ '0xC00002EE', 'Failure Reason: An Error occurred during Logon',\nSubStatus =~ '0xC0000413', 'Logon Failure: The machine you are logging onto is protected by an authentication firewall. The specified account is not allowed to authenticate to the machine',\nstrcat('Unknown reason substatus: ', SubStatus))\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), FailedLogonCount = count() by EventID, \nActivity, Computer, Account, TargetAccount, TargetUserName, TargetDomainName, \nLogonType, LogonTypeName, LogonProcessName, Status, SubStatus, Reason, ResourceId, SourceComputerId, WorkstationName, IpAddress\n| where FailedLogonCount >= threshold\n| extend timestamp = StartTime",
+                "queryFrequency": "PT10M",
+                "queryPeriod": "PT10M",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "0777f138-e5d8-4eab-bec1-e11ddfbc2be2",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Account"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Computer"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IpAddress"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/0dc4e039-39e8-4679-a285-21eb5e545635')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/0dc4e039-39e8-4679-a285-21eb5e545635')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Failed logon attempts in authpriv",
+                "description": "Identifies failed logon attempts from unknown users in Syslog authpriv logs. The unknown user means the account that tried to log in \nisn't provisioned on the machine. A few hits could indicate someone attempting to access a machine they aren't authorized to access. \nIf there are many of hits, especially from outside your network, it could indicate a brute force attack. \nDefault threshold for logon attempts is 15.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let threshold = 15;\n// Below pulls messages from syslog-authpriv logs where there was an authentication failure with an unknown user.\n// IP address of system attempting logon is also extracted from the SyslogMessage field. Some of these messages\n// are aggregated.\nlet authfail = Syslog\n| where Facility =~ \"authpriv\"   // looks at authpriv messages\n| where SyslogMessage contains \"authentication failure\" and SyslogMessage contains \" uid=0\"\n| parse SyslogMessage with * \"rhost=\" ExternalIP\n| project TimeGenerated, Computer, ProcessName, HostIP, ExternalIP, ProcessID;  \n// Below pulls messages from syslog-authpriv logs that show each instance an unknown user tried to logon. \nlet userfail = Syslog \n| where Facility =~ \"authpriv\" \n| where SyslogMessage contains \"user unknown\"\n| project TimeGenerated, Computer, HostIP, ProcessID;\n// Join the two log messages above\nlet userauthfail = authfail | join (userfail) on Computer, HostIP, ProcessID\n| project TimeGenerated, Computer, HostIP, ExternalIP, ProcessID ;\n// Extract the EventTime of the first logon attempt\nlet firstfail = userauthfail\n| summarize arg_min(TimeGenerated, *) by Computer, ExternalIP\n| project Computer, ExternalIP, FirstLogonAttempt = TimeGenerated;\n// Extract the EventTime of the last logon attempt\nlet lastfail = userauthfail\n| summarize arg_max(TimeGenerated, *) by Computer, ExternalIP\n| project Computer, ExternalIP, LatestLogonAttempt = TimeGenerated;\n// Join first and last logon attempt data and calculate the time between them (AttemptPeriodLength).\nlet faildates = firstfail | join (lastfail) on Computer, ExternalIP\n| project ExternalIP, Computer, FirstLogonAttempt, LatestLogonAttempt, TimeBetweenLogonAttempts = LatestLogonAttempt - FirstLogonAttempt;\n// Count the number of failed logon attempts by External IP and internal machine\nlet totalfails = userauthfail\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), TotalLogonAttempts = count() by ExternalIP, Computer, HostIP\n| project StartTimeUtc, EndTimeUtc, ExternalIP, Computer, HostIP, TotalLogonAttempts;\n// Combine total attempts with timing data from above\nlet finalfails = totalfails | join (faildates) on Computer, ExternalIP\n| project StartTimeUtc, EndTimeUtc, SourceAddress = ExternalIP, DestinationHost = Computer, DestinationIP = HostIP, TotalLogonAttempts, FirstLogonAttempt, LatestLogonAttempt, TimeBetweenLogonAttempts\n| order by DestinationHost asc nulls last;\nfinalfails \n| where TotalLogonAttempts >= threshold\n| extend timestamp = StartTimeUtc",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "e7ec9fa6-e7f7-41ed-a34b-b956837a3ee6",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "DestinationHost"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "DestinationIP"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

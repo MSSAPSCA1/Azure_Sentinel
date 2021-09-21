@@ -1,0 +1,403 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/b8cc4221-9836-43ab-9c80-0b91c3a91397')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/b8cc4221-9836-43ab-9c80-0b91c3a91397')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "AD account with Don't Expire Password",
+                "description": "Identifies whenever a user account has the setting \"Password Never Expires\" in the user account properties selected.\nThis is indicated in Security event 4738 in the EventData item labeled UserAccountControl with an included value of %%2089.\n%%2089 resolves to \"Don't Expire Password - Enabled\".",
+                "severity": "Low",
+                "enabled": true,
+                "query": "SecurityEvent\n| where EventID == 4738\n// 2089 value indicates the Don't Expire Password value has been set\n| where UserAccountControl has \"%%2089\" \n| extend Value_2089 = iff(UserAccountControl has \"%%2089\",\"'Don't Expire Password' - Enabled\", \"Not Changed\")\n// 2050 indicates that the Password Not Required value is NOT set, this often shows up at the same time as a 2089 and is the recommended value.  This value may not be in the event. \n| extend Value_2050 = iff(UserAccountControl has \"%%2050\",\"'Password Not Required' - Disabled\", \"Not Changed\")\n// If value %%2082 is present in the 4738 event, this indicates the account has been configured to logon WITHOUT a password. Generally you should only see this value when an account is created and only in Event 4720: Account Creation Event.  \n| extend Value_2082 = iff(UserAccountControl has \"%%2082\",\"'Password Not Required' - Enabled\", \"Not Changed\")\n| project StartTime = TimeGenerated, EventID, Activity, Computer, TargetAccount, TargetSid, AccountType, UserAccountControl, Value_2089, Value_2050, Value_2082, SubjectAccount\n| extend timestamp = StartTime, AccountCustomEntity = TargetAccount, HostCustomEntity = Computer",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "6c360107-f3ee-4b91-9f43-f4cfd90441cf",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            },
+                            {
+                                "identifier": "Sid",
+                                "columnName": "TargetSid"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/be58697c-396b-4d31-9102-f1a256a2b621')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/be58697c-396b-4d31-9102-f1a256a2b621')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "AD FS Remote Auth Sync Connection",
+                "description": "This detection uses Security events from the \"AD FS Auditing\" provider to detect suspicious authentication events on an AD FS server. The results then get\ncorrelated with events from the Windows Filtering Platform (WFP) to detect suspicious incoming network traffic on port 80 on the AD FS server.\nThis could be a sign of a threat actor trying to use replication services on the AD FS server to get its configuration settings and extract\nsensitive information such as AD FS certificates.\nIn order to use this query you need to enable AD FS auditing on the AD FS Server.\nReference: https://twitter.com/OTR_Community/status/1387038995016732672\n",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "// Adjust this to use a longer timeframe to identify ADFS servers\n//let lookback = 0d;\n// Adjust this to adjust detection timeframe\n//let timeframe = 1d;\n// SamAccountName of AD FS Service Account. Filter on the use of a specific AD FS user account\n//let adfsuser = 'adfsadmin';\n// Identify ADFS Servers\nlet ADFS_Servers = (\n    SecurityEvent\n    //| where TimeGenerated > ago(timeframe+lookback)\n    | where EventSourceName == 'AD FS Auditing'\n    | distinct Computer\n);\nSecurityEvent\n    //| where TimeGenerated > ago(timeframe)\n    | where Computer in~ (ADFS_Servers)\n    // A token of type 'http://schemas.microsoft.com/ws/2006/05/servicemodel/tokens/SecureConversation'\n    // for relying party '-' was successfully authenticated.\n    | where EventID == 412\n    | extend EventData = parse_xml(EventData).EventData.Data\n    | extend InstanceId = tostring(EventData[0])\n| join kind=inner\n(\n    SecurityEvent\n    //| where TimeGenerated > ago(timeframe)\n    | where Computer in~ (ADFS_Servers)\n    // Events to identify caller identity from event 412\n    | where EventID == 501\n    | extend EventData = parse_xml(EventData).EventData.Data\n    | where tostring(EventData[1]) contains 'identity/claims/name'\n    | extend InstanceId = tostring(EventData[0])\n    | extend ClaimsName = tostring(EventData[2])\n    // Filter on the use of a specific AD FS user account\n    //| where ClaimsName contains adfsuser\n)\non $left.InstanceId == $right.InstanceId\n| join kind=inner\n(\n    SecurityEvent\n    | where EventID == 5156\n    | where Computer in~ (ADFS_Servers)\n    | extend EventData = parse_xml(EventData).EventData.Data\n    | mv-expand bagexpansion=array EventData\n    | evaluate bag_unpack(EventData)\n    | extend Key = tostring(column_ifexists('@Name', \"\")), Value = column_ifexists('#text', \"\")\n    | evaluate pivot(Key, any(Value), TimeGenerated, Computer, EventID)\n    | extend DestPort = column_ifexists(\"DestPort\", \"\"),\n          Direction = column_ifexists(\"Direction\", \"\"),\n          Application = column_ifexists(\"Application\", \"\"),\n          DestAddress = column_ifexists(\"DestAddress\", \"\"),\n          SourceAddress = column_ifexists(\"SourceAddress\", \"\"),\n          SourcePort = column_ifexists(\"SourcePort\", \"\")\n    // Look for inbound connections from endpoints on port 80\n    | where DestPort == 80 and Direction == '%%14592' and Application == 'System'\n    | where DestAddress !in ('::1','0:0:0:0:0:0:0:1') \n)\non $left.Computer == $right.Computer\n| project TimeGenerated, Computer, ClaimsName, SourceAddress, SourcePort\n| extend HostCustomEntity = Computer, AccountCustomEntity = ClaimsName, IPCustomEntity = SourceAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Collection"
+                ],
+                "alertRuleTemplateName": "2f4165a6-c4fb-4e94-861e-37f1b4d6c0e6",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/500c41a7-9971-4750-8fa8-5a3ae71df063')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/500c41a7-9971-4750-8fa8-5a3ae71df063')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "AD FS Remote HTTP Network Connection",
+                "description": "This detection uses Sysmon events (NetworkConnect events) to detect incoming network traffic on port 80 on AD FS servers. This could be a sign of a threat actor\ntrying to use replication services on the AD FS server to get its configuration settings and extract sensitive information such as AD FS certificates.\nIn order to use this query you need to enable Sysmon telemetry on the AD FS Server.\nReference: https://twitter.com/OTR_Community/status/1387038995016732672\n",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "// Adjust this to use a longer timeframe to identify ADFS servers\n//let lookback = 0d;\n// Adjust this to adjust detection timeframe\n//let timeframe = 1d;\n// Filter out other servers in the AD FS farm\nlet ADFSServersList = dynamic([\"ADFS02.domain.com\",\"ADFS03.domain.com\"]);\n// Start by identifying ADFS servers to reduce FP chance\nlet ADFS_Servers = (\nEvent\n//| where TimeGenerated > ago(timeframe+lookback)\n| where Source == \"Microsoft-Windows-Sysmon\"\n| where EventID == 18\n| where Computer !in (ADFSServersList)\n| extend EventData = parse_xml(EventData).DataItem.EventData.Data\n| mv-expand bagexpansion=array EventData\n| evaluate bag_unpack(EventData)\n| extend Key = tostring(column_ifexists('@Name', \"\")), Value = column_ifexists('#text', \"\")\n| evaluate pivot(Key, any(Value), TimeGenerated, Source, EventLog, Computer, EventLevel, EventLevelName, EventID, UserName, MG, ManagementGroupName, _ResourceId)\n| extend Image = column_ifexists(\"Image\", \"\")\n| extend process = split(Image, '\\\\', -1)[-1]\n| where process =~ \"Microsoft.IdentityServer.ServiceHost.exe\"\n| summarize by Computer\n);\n// Look for ADFS servers receiving connections over port 80\nEvent\n//| where TimeGenerated > ago(timeframe)\n| where Source == \"Microsoft-Windows-Sysmon\"\n| where Computer in~ (ADFS_Servers)\n| extend RenderedDescription = tostring(split(RenderedDescription, \":\")[0])\n| extend EventData = parse_xml(EventData).DataItem.EventData.Data\n| mv-expand bagexpansion=array EventData\n| evaluate bag_unpack(EventData)\n| extend Key = tostring(column_ifexists('@Name', \"\")), Value = column_ifexists('#text', \"\")\n| evaluate pivot(Key, any(Value), TimeGenerated, Source, EventLog, Computer, EventLevel, EventLevelName, EventID, UserName, RenderedDescription, MG, ManagementGroupName, _ResourceId)\n| extend RuleName = column_ifexists(\"RuleName\", \"\"), TechniqueId = column_ifexists(\"TechniqueId\", \"\"),  TechniqueName = column_ifexists(\"TechniqueName\", \"\")\n| parse RuleName with * 'technique_id=' TechniqueId ',' * 'technique_name=' TechniqueName\n| where EventID == 3\n// Look for endpoints connecting to the AD FS server over port 80\n| extend DestinationPort = column_ifexists(\"DestinationPort\", \"\"), Image = column_ifexists(\"Image\", \"\"), Initiated = column_ifexists(\"Initiated\", \"\"), SourceIp = column_ifexists(\"DestinationIp\", \"\"), DestinationIp = column_ifexists(\"DestinationIp\", \"\")\n| where DestinationPort == 80\n| extend process = split(Image, '\\\\', -1)[-1]\n// Look for the System process receiving connections\n| where process == 'System' and Initiated == 'false'\n| where DestinationIp !in ('::1','0:0:0:0:0:0:0:1')\n| extend Operation = RenderedDescription\n| project-reorder TimeGenerated, Operation, Image, Computer, UserName\n| extend HostCustomEntity = Computer, AccountCustomEntity = UserName, IPCustomEntity = SourceIp",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Collection"
+                ],
+                "alertRuleTemplateName": "d57c33a9-76b9-40e0-9dfa-ff0404546410",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/da2869c7-df56-4d4e-bf5e-ed43f7b55041')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/da2869c7-df56-4d4e-bf5e-ed43f7b55041')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "AD user enabled and password not set within 48 hours",
+                "description": "Identifies when an account is enabled with a default password and the password is not set by the user within 48 hours.\nEffectively, there is an event 4722 indicating an account was enabled and within 48 hours, no event 4723 occurs which \nindicates there was no attempt by the user to set the password. This will show any attempts (success or fail) that occur \nafter 48 hours, which can indicate too long of a time period in setting the password to something that only the user knows.\nIt is recommended that this time period is adjusted per your internal company policy.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let starttime = 3d;\nlet SecEvents = materialize ( SecurityEvent | where TimeGenerated >= ago(starttime)\n| where EventID in (4722,4723) | where TargetUserName !endswith \"$\"\n| project TimeGenerated, EventID, Activity, Computer, TargetAccount, TargetSid, SubjectAccount, SubjectUserSid);\nlet userEnable = SecEvents\n| extend EventID4722Time = TimeGenerated\n// 4722: User Account Enabled\n| where EventID == 4722\n| project Time_Event4722 = TimeGenerated, TargetAccount, TargetSid, SubjectAccount_Event4722 = SubjectAccount, SubjectUserSid_Event4722 = SubjectUserSid, Activity_4722 = Activity, Computer_4722 = Computer;\nlet userPwdSet = SecEvents\n// 4723: Attempt made by user to set password\n| where EventID == 4723\n| project Time_Event4723 = TimeGenerated, TargetAccount, TargetSid, SubjectAccount_Event4723 = SubjectAccount, SubjectUserSid_Event4723 = SubjectUserSid, Activity_4723 = Activity, Computer_4723 = Computer;\nuserEnable | join kind=leftouter userPwdSet on TargetAccount, TargetSid\n| extend PasswordSetAttemptDelta_Min = datetime_diff('minute', Time_Event4723, Time_Event4722)\n| where PasswordSetAttemptDelta_Min > 2880 or isempty(PasswordSetAttemptDelta_Min)\n| project-away TargetAccount1, TargetSid1\n| extend Reason = @\"User either has not yet attempted to set the initial password after account was enabled or it occurred after 48 hours\"\n| order by Time_Event4722 asc \n| extend timestamp = Time_Event4722, AccountCustomEntity = TargetAccount, HostCustomEntity = Computer_4722\n| project-reorder Time_Event4722, Time_Event4723, PasswordSetAttemptDelta_Min, TargetAccount, TargetSid",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P3D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "62085097-d113-459f-9ea7-30216f2ee6af",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            },
+                            {
+                                "identifier": "Sid",
+                                "columnName": "TargetSid"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/101c2866-5877-45c7-9804-ce5a78c5e0f3')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/101c2866-5877-45c7-9804-ce5a78c5e0f3')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "ADFS DKM Master Key Export",
+                "description": "Identifies an export of the ADFS DKM Master Key from Active Directory.\nReferences: https://blogs.microsoft.com/on-the-issues/2020/12/13/customers-protect-nation-state-cyberattacks/, \nhttps://www.fireeye.com/blog/threat-research/2020/12/evasive-attacker-leverages-solarwinds-supply-chain-compromises-with-sunburst-backdoor.html?1\nTo understand further the details behind this detection, please review the details in the original PR and subequent PR update to this:\nhttps://github.com/Azure/Azure-Sentinel/pull/1562#issue-551542469\nhttps://github.com/Azure/Azure-Sentinel/pull/1512#issue-543053339\n",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "(union isfuzzy=true (SecurityEvent \n| where EventID == 4662 // You need to create a SACL on the ADFS Policy Store DKM group for this event to be created. \n| where ObjectServer == 'DS'\n| where OperationType == 'Object Access'\n//| where ObjectName contains '<GUID of ADFS Policy Store DKM Group object' This is unique to the domain. Check description for more details.\n| where ObjectType contains '5cb41ed0-0e4c-11d0-a286-00aa003049e2' // Contact Class\n| where Properties contains '8d3bca50-1d7e-11d0-a081-00aa006c33ed' // Picture Attribute - Ldap-Display-Name: thumbnailPhoto\n| extend timestamp = TimeGenerated, HostCustomEntity = Computer, AccountCustomEntity = SubjectAccount),\n(DeviceEvents\n| where ActionType =~ \"LdapSearch\"\n| where AdditionalFields.AttributeList contains \"thumbnailPhoto\"\n| where AdditionalFields.DistinguishedName contains \"CN=ADFS,CN=Microsoft,CN=Program Data\" // Filter results to show only hits related to the ADFS AD container\n| extend timestamp = TimeGenerated, HostCustomEntity = DeviceName, AccountCustomEntity = InitiatingProcessAccountName)\n)",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Collection"
+                ],
+                "alertRuleTemplateName": "18e6a87e-9d06-4a4e-8b59-3469cd49552d",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/4fd3e1b6-5e63-4227-b6b7-f0805516efbd')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/4fd3e1b6-5e63-4227-b6b7-f0805516efbd')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "ADO Build Variable Modified by New User.",
+                "description": "Variables can be configured and used at any stage of the build process in Azure DevOps to inject values. An attacker with the required permissions could modify or add to these variables to conduct malicious activity such as changing paths or remote endpoints called during the build. As variables are often changed by users just detecting these changes would have a high false positive rate. This detection looks for modifications to variable groups where that user has not been observed modifying them before.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let lookback = 14d;\nlet timeframe = 1d;\nlet historical_data =\nAzureDevOpsAuditing\n| where TimeGenerated > ago(lookback) and TimeGenerated < ago(timeframe)\n| where OperationName =~ \"Library.VariableGroupModified\"\n| extend variables = Data.Variables\n| extend VariableGroupId = tostring(Data.VariableGroupId)\n| extend UserKey = strcat(VariableGroupId, \"-\", ActorUserId)\n| project UserKey;\nAzureDevOpsAuditing\n| where TimeGenerated > ago(timeframe)\n| where OperationName =~ \"Library.VariableGroupModified\"\n| extend VariableGroupName = tostring(Data.VariableGroupName)\n| extend VariableGroupId = tostring(Data.VariableGroupId)\n| extend UserKey = strcat(VariableGroupId, \"-\", ActorUserId)\n| where UserKey !in (historical_data)\n| project-away UserKey\n| project-reorder TimeGenerated, VariableGroupName, ActorUPN, IpAddress, UserAgent\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "DefenseEvasion"
+                ],
+                "alertRuleTemplateName": "3b9a44d7-c651-45ed-816c-eae583a6f2f1",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}
