@@ -117,4 +117,4 @@ def main():
     print("Process Completed.")
     input("\nPress Enter to Exit.")
 
-main() # Script source: https://github.com/nathanjalston/Azure_Sentinel_Hackathon_2021
+main()
