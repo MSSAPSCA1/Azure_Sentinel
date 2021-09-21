@@ -1,13 +1,19 @@
 # [Azure Sentinel Hackathon 2021](https://github.com/MSSAPSCA1/Azure_Sentinel)
 **Azure Resource Manager (ARM) Templates for Bulk Activation of Azure Sentinel Analytics Rules.**
 ___
-## [Default ARM Templates](https://github.com/MSSAPSCA1/Azure_Sentinel/tree/main/Default_AZ_Sentinel_Rule_Templates)
+## [ARM Templates for Default Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/tree/main/Default_AZ_Sentinel_Rule_Templates)
 
-Default ARM templates for specific sets of Azure Sentinel Analytics Rules, including:
+ARM templates for specific sets of default Azure Sentinel Analytics Rules, including:
 
 *  [Vectra Detection and AI Detection](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/Vectra_Detect_AZ_Sentinel_Analytics_Rules.json)
 ___
-## [ARM Template Editor](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/AZ_Sentinel_Analytics_Rules_Editor.py)
+## [ARM Templates for Quick Response Analytics Rules]()
+
+Modified ARM templates for specific sets of high frequency Azure Sentinel Analytics Rules, including:
+
+* [Placeholder]()
+___
+## [ARM Template Editor for Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/AZ_Sentinel_Analytics_Rules_Editor.py)
 
 Python script to modify properties of Azure Resource Manager (ARM) templates for bulk modification of Azure Sentinel Analytics Rules. Currently capable of modifying Rule Status (Enabled/Disabled), Rule Frequency, and Rule Period for any number of Azure Sentinel Analytics Rules contained within a single ARM template.
 
