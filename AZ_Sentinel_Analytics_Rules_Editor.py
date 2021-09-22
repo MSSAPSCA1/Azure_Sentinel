@@ -1,37 +1,41 @@
 import json
 
-# Prompts user for path to AZ Sentinel JSON rule template and checks the validity.
-def read_in():
+# Prompts user for paths to AZ Sentinel ARM rule templates and checks the validity.
+def sel_files():
     test = True
     while test == True:
         test = False
         
-        path = str(input("Enter the file path of a JSON rule template (CTRL+C to Exit):\n"))
+        path = (input("Enter the file path(s) of Azure Sentinel Analytics Rules ARM Templates.\nSeparate each file path by using a comma (,). (CTRL+C to Exit):\n")).replace(" ", "").split(",")
 
-        if path.split(".")[-1] != "json":
-            print("\nIncorrect file type. Please try again.")
-            test = True
+        for file in path:
+            if file.split(".")[-1] != "json":
+                print("\nIncorrect file type. Please try again.")
+                test = True
+                break
+        
+        if test == True:
             continue
+    
+        for file in path:
+            try:
+                with open(file, "r") as rule_template:
+                    continue
+            except (FileNotFoundError, OSError):
+                print("\nThe file path you entered does not exist. Please try again.")
+                test = True
+                break
 
-        try:
-            with open(path, "r") as rule_template:
-                data = json.load(rule_template)
-        except FileNotFoundError:
-            print("\nThe file path you entered does not exist. Please try again.")
-            test = True
-            continue
+        if test == True:
+            continue       
 
-    # Creates path to new file and modifies the data retrieved from the original file.
-    file_name = path.split("\\")[-1]
-    new_path = path.replace(file_name, ("NEW_" + file_name))
-    return data, new_path
+    return path
 
-# Modifies Azure Sentinel Rules based on user selection.
-def modify(data, properties):
+# Prompts user to select properties to modify and select or enter values.
+def sel_vals(properties):
 
     val_dict = {"enabled":{"Name":"Rule Status", "Selection":{"1":"Enabled", "2":"Disabled"}, "Value":{"1":True, "2":False}}, "queryFrequency":{"Name":"Rule Frequency", "Selection":{"1":"Enter frequency in Days", "2":"Enter frequency in Hours", "3":"Enter frequency in Minutes"}, "Value":{"1":"P_D", "2":"PT_H", "3":"PT_M"}}, "queryPeriod":{"Name":"Rule Period", "Selection":{"1":"Enter period in Days", "2":"Enter period in Hours", "3":"Enter period in Minutes"}, "Value":{"1":"P_D", "2":"PT_H", "3":"PT_M"}}}
-
-    rule_index = len(data['resources'])
+    new_val = {}
     for name in properties:    
         test = True
         while test == True:
@@ -79,23 +83,33 @@ def modify(data, properties):
                 val_type = val_dict[name]["Selection"][user_val]
                 print("\nSetting " + val_dict[name]["Name"] + " to " + val_type + "...")
 
-        for index in range(rule_index):
-            data['resources'][index]['properties'][name] = val
+            new_val[name] = val
 
-    return data
+    return new_val
 
-# Exports modified data into new JSON file.
-def write_out(data, new_path):
+# Modifies Azure Sentinel Rules based on user selection and Exports modified data into new ARM template.
+def modify(path, new_val, properties):
 
-    with open(new_path, "w") as new_rule_template:
-        json.dump(data, new_rule_template, indent = 4)
+    for file in path:
+        with open(file, "r") as rule_template:
+            data = json.load(rule_template)
+        
+        rule_index = len(data['resources'])
+        for name in properties:
+            for index in range(rule_index):
+                data['resources'][index]['properties'][name] = new_val[name]
+
+        file_name = file.split("\\")[-1]
+        new_path = file.replace(file_name, ("NEW_" + file_name))
+        with open(new_path, "w") as new_rule_template:
+            json.dump(data, new_rule_template, indent = 4)
 
 # Controls script.
 def main():
-    data = read_in()
+    path = sel_files()
 
     user_sel_dict = {"1":"enabled", "2":"queryFrequency", "3":"queryPeriod"}
-    properties = set()
+    properties = []
     test = True
     while test == True:
         test = False
@@ -104,17 +118,17 @@ def main():
 
         try:
             for num in user_sel:
-                properties.add(user_sel_dict[num])
+                properties.append(user_sel_dict[num])
         except KeyError:
             print("\nYour Input \"" + ", ".join(user_sel) + "\" is not valid.\nOne or more of the options you selected does not exist.\nPlease try again.\n")
             input("Press Enter to try again or CRTL+C to exit.")
             test = True
             continue
 
-    mod_data = modify(data[0], properties)
-    write_out(mod_data, data[1])
+    new_val = sel_vals(properties)
+    modify(path, new_val, properties)
 
     print("Process Completed.")
     input("\nPress Enter to Exit.")
 
-main()
+main() # Script Source: https://github.com/nathanjalston
