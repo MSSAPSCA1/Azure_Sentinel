@@ -9,6 +9,7 @@ ARM templates for specific sets of default Azure Sentinel Analytics Rules.
 
 ### Analytics Rules:
 *  [Vectra Detection and AI Detection](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/Vectra_Detect_AZ_Sentinel_Analytics_Rules.json)
+*  [(Preview) TI map...](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/(Preview)_TI_map_AZ_Sentinel_Analytics_Rules.json)
 ___
 ## [ARM Templates for Quick Response Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/tree/main/Quick_Response_AZ_Sentinel_Rule_Templates)
 
