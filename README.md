@@ -37,7 +37,7 @@ Python script to modify properties of Azure Resource Manager (ARM) templates for
 
 **Procedure:**
 1.  Open the AZ_Sentinel_Analytics_Rules_Editor.py using a Python 3 Interpreter.
-2.  Enter the path to the ARM template file(s). (i.e. C:\fakepath\AZ_Sentinel\Vectra_Detect_AZ_Sentinel_Analytics_Rules.json)
+2.  Enter the path to the ARM template file(s) (i.e. C:\fakepath\AZ_Sentinel\Vectra_Detect_AZ_Sentinel_Analytics_Rules.json), or drag-and-drop each file, one at a time. Separate each file using a comma (,).
 3.  Select options by entering the number associated with the option.
 4.  Enter requested data based on constraints specified in the program and in the Notes from Azure Sentinel.
 5.  Once the process is completed, a new file or new files will be created at the same address as the original file(s) with the word "NEW" appended as the prefix of the filename(s). You will now have two files for each ARM template, the orignal and the new file.
