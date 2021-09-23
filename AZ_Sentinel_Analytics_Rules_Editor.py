@@ -6,9 +6,10 @@ def sel_files():
     while test == True:
         test = False
         
-        path = (input("Enter the file path(s) of Azure Sentinel Analytics Rules ARM Templates.\nSeparate each file path by using a comma (,). (CTRL+C to Exit):\n")).replace(" ", "").split(",")
+        path = (input("\nEnter the file path(s) of Azure Sentinel Analytics Rules ARM Templates.\nSeparate each file path by using a comma (,). (CTRL+C to Exit):\n")).replace("'","").replace('"','').replace("& ","").split(",")
 
         for file in path:
+            file = file.strip()
             if file.split(".")[-1] != "json":
                 print("\nIncorrect file type. Please try again.")
                 test = True
@@ -72,8 +73,7 @@ def sel_vals(properties):
                 val = val.replace("_", time_val)
 
                 if time_val == "1":
-                    time_type = val_dict[name]["Selection"][user_val].split(" ")[-1]
-                    time_type = time_type.replace("s", "")
+                    time_type = val_dict[name]["Selection"][user_val].split(" ")[-1].replace("s", "")
                 else:
                     time_type = val_dict[name]["Selection"][user_val].split(" ")[-1]
 
@@ -89,6 +89,27 @@ def sel_vals(properties):
 
 # Modifies Azure Sentinel Rules based on user selection and Exports modified data into new ARM template.
 def modify(path, new_val, properties):
+    
+    test = True
+    while test == True:
+        test = False
+        prefix = input("\nEnter a prefix for the new filename(s) (Only use A-Z, a-z, 0-9, underscores, or spaces):\n*** Example Input: NEW_ ***\n\nEnter prefix here: ")
+        
+        if len(prefix) < 1:
+                print("\nThe prefix cannot be empty. Please enter at least one value.\nPlease try again.")
+                test = True
+                continue
+
+        for i in range(len(prefix)):
+            if prefix[i].isalpha() == True or prefix[i].isdecimal() == True or prefix[i] in [" ", "_"]:
+                continue
+            else:    
+                print("\nYour Input \"" + prefix + "\" is not valid.\nOne or more of the characters you entered is not compatible.\nPlease try again.\n")
+                test = True
+                break
+        
+        if test == True:
+            continue
 
     for file in path:
         with open(file, "r") as rule_template:
@@ -100,7 +121,7 @@ def modify(path, new_val, properties):
                 data['resources'][index]['properties'][name] = new_val[name]
 
         file_name = file.split("\\")[-1]
-        new_path = file.replace(file_name, ("NEW_" + file_name))
+        new_path = file.replace(file_name, (prefix + file_name))
         with open(new_path, "w") as new_rule_template:
             json.dump(data, new_rule_template, indent = 4)
 
@@ -114,21 +135,23 @@ def main():
     while test == True:
         test = False
         
-        user_sel = input("\nSelect the properties to be modified by entering each selection separated by a comma:\n*** Example Input: 1,2,3 ***\n\n1. Rule Status (Enabled/Disabled)\n2. Rule Frequency\n3. Rule Period\n\nEnter values here: ").replace(" ", "").split(",")
+        user_sel = input("\nSelect the properties to be modified by entering each selection separated by a comma (CTRL+C to Exit):\n*** Example Input: 1,2,3 ***\n\n1. Rule Status (Enabled/Disabled)\n2. Rule Frequency\n3. Rule Period\n\nEnter values here: ").replace(" ", "").split(",")
 
         try:
             for num in user_sel:
-                properties.append(user_sel_dict[num])
+                if user_sel_dict[num] not in properties:
+                    properties.append(user_sel_dict[num])
+                else:
+                    continue
         except KeyError:
             print("\nYour Input \"" + ", ".join(user_sel) + "\" is not valid.\nOne or more of the options you selected does not exist.\nPlease try again.\n")
-            input("Press Enter to try again or CRTL+C to exit.")
             test = True
             continue
 
     new_val = sel_vals(properties)
     modify(path, new_val, properties)
 
-    print("Process Completed.")
+    print("\nProcess Completed.")
     input("\nPress Enter to Exit.")
 
-main() # Script Source: https://github.com/nathanjalston
+main()
