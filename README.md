@@ -1,15 +1,18 @@
 # [Azure Sentinel Hackathon 2021](https://github.com/MSSAPSCA1/Azure_Sentinel)
 **Azure Resource Manager (ARM) Templates for Bulk Activation of Azure Sentinel Analytics Rules.**
-
-Expedites the process for deploying most of Azure Sentinel's built-in Scheduled Analytics Rules.
 ___
 ## [ARM Templates for Default Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/tree/main/Default_AZ_Sentinel_Rule_Templates)
 
-ARM templates for specific sets of default Azure Sentinel Analytics Rules.
+Default ARM templates for most of Azure Sentinel's built-in Scheduled Analytics Rules.
 * Rule Frequency = Default
 * Rule Period = Default
 
 ### Analytics Rules:
+* [0-A](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/0-A_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [A-F](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/A-F_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [F-N](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/F-N_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [N-S](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/N-S_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [S-Z](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/S-Z_Azure_Sentinel_Scheduled_Analytics_Rules.json)
 *  [(Preview) TI map...](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/(Preview)_TI_map_AZ_Sentinel_Analytics_Rules.json)
 *  [Account added and removed from privileged groups](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/Account_added_and_removed_from_privileged_groups__AZ_Sentinel_Analytics_Rule.json)
 *  [Active Directory](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/Active_Directory_AZ_Sentinel_Analytics_Rules.json)
@@ -53,16 +56,19 @@ ARM templates for specific sets of default Azure Sentinel Analytics Rules.
 *  [External user added and removed in short timeframe](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/External..._AZ_Sentinel_Analytics_Rules.json)
 *  [Failed...](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/Failed..._AZ_Sentinel_Analytics_Rules.json)
 *  [First access credential added to Application or Service Principal where no credential was present](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/First_access_credential_added_to_Application_or..._AZ_Sentinel_Analytics_Rule.json)
-*  [Vectra Detection and AI Detection](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/Vectra_Detect_AZ_Sentinel_Analytics_Rules.json)
 ___
 ## [ARM Templates for Quick Response Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/tree/main/Quick_Response_AZ_Sentinel_Rule_Templates)
 
-Modified ARM templates for specific sets of high frequency Azure Sentinel Analytics Rules. 
+ARM templates for most of Azure Sentinel's built-in Scheduled Analytics Rules, modified for quick response. 
 * Rule Frequency = 10 minutes
 * Rule Period = 30 minutes
 
 ### Analytics Rules:
-* [Vectra Detection and AI Detection](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Quick_Response_AZ_Sentinel_Rule_Templates/QR_Vectra_Detect_AZ_Sentinel_Analytics_Rules.json)
+* [0-A](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Quick_Response_AZ_Sentinel_Rule_Templates/QR_0-A_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [A-F](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Quick_Response_AZ_Sentinel_Rule_Templates/QR_A-F_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [F-N](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Quick_Response_AZ_Sentinel_Rule_Templates/QR_F-N_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [N-S](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Quick_Response_AZ_Sentinel_Rule_Templates/QR_N-S_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [S-Z](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Quick_Response_AZ_Sentinel_Rule_Templates/QR_S-Z_Azure_Sentinel_Scheduled_Analytics_Rules.json)
 ___
 ## [ARM Template Editor for Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/AZ_Sentinel_Analytics_Rules_Editor.py)
 
