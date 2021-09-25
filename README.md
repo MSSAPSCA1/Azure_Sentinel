@@ -1,5 +1,7 @@
 # [Azure Sentinel Hackathon 2021](https://github.com/MSSAPSCA1/Azure_Sentinel)
 **Azure Resource Manager (ARM) Templates for Bulk Activation of Azure Sentinel Analytics Rules.**
+
+Expedites the process for deploying most of Azure Sentinel's built-in Scheduled Analytics Rules.
 ___
 ## [ARM Templates for Default Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/tree/main/Default_AZ_Sentinel_Rule_Templates)
 
