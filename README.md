@@ -8,11 +8,11 @@ Default ARM templates for most of Azure Sentinel's built-in Scheduled Analytics 
 * Rule Period = Default
 
 ### Analytics Rules:
-* [0-A](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/0-A_Azure_Sentinel_Scheduled_Analytics_Rules.json)
-* [A-F](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/A-F_Azure_Sentinel_Scheduled_Analytics_Rules.json)
-* [F-N](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/F-N_Azure_Sentinel_Scheduled_Analytics_Rules.json)
-* [N-S](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/N-S_Azure_Sentinel_Scheduled_Analytics_Rules.json)
-* [S-Z](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/S-Z_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [0-A](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/(1)%200-A_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [A-F](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/(2)%20A-F_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [F-N](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/(3)%20F-N_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [N-S](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/(4)%20N-S_Azure_Sentinel_Scheduled_Analytics_Rules.json)
+* [S-Z](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/(5)%20S-Z_Azure_Sentinel_Scheduled_Analytics_Rules.json)
 *  [(Preview) TI map...](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/(Preview)_TI_map_AZ_Sentinel_Analytics_Rules.json)
 *  [Account added and removed from privileged groups](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/Account_added_and_removed_from_privileged_groups__AZ_Sentinel_Analytics_Rule.json)
 *  [Active Directory](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Default_AZ_Sentinel_Rule_Templates/Active_Directory_AZ_Sentinel_Analytics_Rules.json)
