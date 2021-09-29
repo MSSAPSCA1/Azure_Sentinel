@@ -1,0 +1,115 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/4c438880-acd8-4189-8de8-b92a735a6880')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/4c438880-acd8-4189-8de8-b92a735a6880')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Potential Build Process Compromise",
+                "description": "The query looks for source code files being modified immediately after a build process is started. The purpose of this is to look for malicious code injection during the build process.\nMore details: https://techcommunity.microsoft.com/t5/azure-sentinel/monitoring-the-software-supply-chain-with-azure-sentinel/ba-p/2176463",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "// How far back to look for events from\nlet timeframe = 1d;\n// How close together build events and file modifications should occur to alert (make this smaller to reduce FPs)\nlet time_window = 5m;\n// Edit this to include build processes used\nlet build_processes = dynamic([\"MSBuild.exe\", \"dotnet.exe\", \"VBCSCompiler.exe\"]);\n// Include any processes that you want to allow to edit files during/around the build process\nlet allow_list = dynamic([\"\"]);\nSecurityEvent\n| where TimeGenerated > ago(timeframe)\n// Look for build process starts\n| where EventID == 4688\n| where Process has_any (build_processes)\n| summarize by BuildParentProcess=ParentProcessName, BuildProcess=Process, BuildAccount = Account, Computer, BuildCommand=CommandLine, timekey= bin(TimeGenerated, time_window), BuildProcessTime=TimeGenerated\n| join kind=inner(\nSecurityEvent\n| where TimeGenerated > ago(timeframe)\n// Look for file modifications to code file\n| where EventID == 4663\n| where Process !in (allow_list)\n// Look for code files, edit this to include file extensions used in build.\n| where ObjectName endswith \".cs\" or ObjectName endswith \".cpp\"\n// 0x6 and 0x4 for file append, 0x100 for file replacements\n| where AccessMask == \"0x6\"  or AccessMask == \"0x4\" or AccessMask == \"0X100\"\n| summarize by FileEditParentProcess=ParentProcessName, FileEditAccount = Account, Computer, FileEdited=ObjectName, FileEditProcess=ProcessName, timekey= bin(TimeGenerated, time_window), FileEditTime=TimeGenerated)\n// join where build processes and file modifications seen at same time on same host\non timekey, Computer\n// Limit to only where the file edit happens after the build process starts\n| where BuildProcessTime <= FileEditTime\n| summarize make_set(FileEdited), make_set(FileEditProcess), make_set(FileEditAccount) by timekey, Computer, BuildParentProcess, BuildProcess\n| extend HostCustomEntity=Computer, timestamp=timekey",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "5ef06767-b37c-4818-b035-47de950d0046",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8f8b2b3e-7440-4814-b5a4-df00b74a0fdd')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8f8b2b3e-7440-4814-b5a4-df00b74a0fdd')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Potential Build Process Compromise - MDE",
+                "description": "The query looks for source code files being modified immediately after a build process is started. The purpose of this is to look for malicious code injection during the build process. This query uses Microsoft Defender for Endpoint telemetry.\nMore details: https://techcommunity.microsoft.com/t5/azure-sentinel/monitoring-the-software-supply-chain-with-azure-sentinel/ba-p/2176463",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "// How far back to look for events from\nlet timeframe = 1d;\n// How close together build events and file modifications should occur to alert (make this smaller to reduce FPs)\nlet time_window = 5m;\n// Edit this to include build processes used\nlet build_processes = dynamic([\"MSBuild.exe\", \"dotnet.exe\", \"VBCSCompiler.exe\"]);\n// Include any processes that you want to allow to edit files during/around the build process\nlet allow_list = dynamic([]);\nDeviceProcessEvents\n| where TimeGenerated > ago(timeframe)\n// Look for build process starts\n| where FileName has_any (build_processes)\n| summarize by BuildParentProcess=InitiatingProcessFileName, BuildProcess=FileName, BuildAccount = AccountName, DeviceName, BuildCommand=ProcessCommandLine, timekey= bin(TimeGenerated, time_window), BuildProcessTime=TimeGenerated\n| join kind=inner(\nDeviceFileEvents\n| where TimeGenerated > ago(timeframe)\n| where InitiatingProcessFileName !in (allow_list)\n| where ActionType == \"FileCreated\"  or ActionType == \"FileModified\"\n// Look for code files, edit this to include file extensions used in build.\n| where FileName endswith \".cs\" or FileName endswith \".cpp\"\n| summarize by FileEditParentProcess=InitiatingProcessParentFileName, FileEditAccount = InitiatingProcessAccountName, DeviceName, FileEdited=FileName, FileEditProcess=InitiatingProcessFileName, timekey= bin(TimeGenerated, time_window), FileEditTime=TimeGenerated)\n// join where build processes and file modifications seen at same time on same host\non timekey, DeviceName\n// Limit to only where the file edit happens after the build process starts\n| where BuildProcessTime <= FileEditTime\n| summarize make_set(FileEdited), make_set(FileEditProcess), make_set(FileEditAccount) by timekey, DeviceName, BuildParentProcess, BuildProcess\n| extend HostCustomEntity=DeviceName, timestamp=timekey",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "1bf6e165-5e32-420e-ab4f-0da8558a8be2",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

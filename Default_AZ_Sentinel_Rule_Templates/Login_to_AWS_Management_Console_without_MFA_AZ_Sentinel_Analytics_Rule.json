@@ -1,0 +1,75 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/7ba29a37-ff8b-493a-945c-0c5c80d62466')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/7ba29a37-ff8b-493a-945c-0c5c80d62466')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Login to AWS Management Console without MFA",
+                "description": "Multi-Factor Authentication (MFA) helps you to prevent credential compromise. This alert identifies logins to the AWS Management Console without MFA.\nYou can limit this detection to trigger for adminsitrative accounts if you do not have MFA enabled on all accounts.\nThis is done by looking at the eventName ConsoleLogin and if the AdditionalEventData field indicates MFA was NOT used \nand the ResponseElements field indicates NOT a Failure. Thereby indicating that a non-MFA login was successful.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "AWSCloudTrail\n| where EventName =~ \"ConsoleLogin\" \n| extend MFAUsed = tostring(parse_json(AdditionalEventData).MFAUsed), LoginResult = tostring(parse_json(ResponseElements).ConsoleLogin)\n| where MFAUsed !~ \"Yes\" and LoginResult !~ \"Failure\"\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated) by EventName, EventTypeName, LoginResult, MFAUsed, UserIdentityAccountId,  UserIdentityPrincipalid, UserAgent, \nUserIdentityUserName, SessionMfaAuthenticated, SourceIpAddress, AWSRegion\n| extend timestamp = StartTimeUtc, AccountCustomEntity = UserIdentityUserName, IPCustomEntity = SourceIpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "DefenseEvasion",
+                    "PrivilegeEscalation",
+                    "Persistence",
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "d25b1998-a592-4bc5-8a3a-92b39eedb1bc",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

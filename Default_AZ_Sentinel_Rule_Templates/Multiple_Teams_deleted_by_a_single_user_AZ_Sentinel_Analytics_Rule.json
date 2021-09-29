@@ -1,0 +1,63 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/9324f5bc-2631-458d-80d2-3109f0c22c7f')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/9324f5bc-2631-458d-80d2-3109f0c22c7f')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Multiple Teams deleted by a single user",
+                "description": "This detection flags the occurrences of deleting multiple teams within an hour.\nThis data is a part of Office 365 Connector in Azure Sentinel.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "// Adjust this value to change how many Teams should be deleted before including\nlet max_delete_count = 3;\n// Adjust this value to change the timewindow the query runs over\n  OfficeActivity\n| where OfficeWorkload =~ \"MicrosoftTeams\" \n| where Operation =~ \"TeamDeleted\"\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), DeletedTeams = make_set(TeamName) by UserId\n| where array_length(DeletedTeams) > max_delete_count\n| extend timestamp = StartTime, AccountCustomEntity = UserId",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Impact"
+                ],
+                "alertRuleTemplateName": "173f8699-6af5-484a-8b06-8c47ba89b380",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

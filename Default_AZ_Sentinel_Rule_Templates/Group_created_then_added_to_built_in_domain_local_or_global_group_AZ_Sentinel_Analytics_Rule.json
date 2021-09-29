@@ -1,0 +1,77 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/4beb2613-29ca-447a-bcea-dbe656d277bf')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/4beb2613-29ca-447a-bcea-dbe656d277bf')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Group created then added to built in domain local or global group",
+                "description": "Identifies when a recently created Group was added to a privileged built in domain local group or global group such as the \nEnterprise Admins, Cert Publishers or DnsAdmins.  Be sure to verify this is an expected addition.\nReferences: For AD SID mappings - https://docs.microsoft.com/windows/security/identity-protection/access-control/active-directory-security-groups.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let WellKnownLocalSID = \"S-1-5-32-5[0-9][0-9]$\";\nlet WellKnownGroupSID = \"S-1-5-21-[0-9]*-[0-9]*-[0-9]*-5[0-9][0-9]$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1102$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1103$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-498$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1000$\";\nlet GroupAddition = SecurityEvent \n// 4728 - A member was added to a security-enabled global group\n// 4732 - A member was added to a security-enabled local group\n// 4756 - A member was added to a security-enabled universal group  \n| where EventID in (\"4728\", \"4732\", \"4756\") \n| where AccountType =~ \"User\" and MemberName == \"-\"\n// Exclude Remote Desktop Users group: S-1-5-32-555\n| where TargetSid !in (\"S-1-5-32-555\")\n| where TargetSid matches regex WellKnownLocalSID or TargetSid matches regex WellKnownGroupSID\n| project GroupAddTime = TimeGenerated, GroupAddEventID = EventID, GroupAddActivity = Activity, GroupAddComputer = Computer, GroupAddTargetAccount = TargetAccount, \nGroupAddTargetSid = TargetSid, GroupAddSubjectAccount = SubjectAccount, GroupAddSubjectUserSid = SubjectUserSid, GroupSid = MemberSid;\nlet GroupCreated = SecurityEvent\n// 4727 - A security-enabled global group was created\n// 4731 - A security-enabled local group was created\n// 4754 - A security-enabled universal group was created\n| where EventID in (\"4727\", \"4731\", \"4754\")\n| where AccountType =~ \"User\"\n| project GroupCreateTime = TimeGenerated, GroupCreateEventID = EventID, GroupCreateActivity = Activity, GroupCreateComputer = Computer, GroupCreateTargetAccount = TargetAccount, \nGroupCreateSubjectAccount = SubjectAccount, GroupCreateSubjectUserSid = SubjectUserSid, GroupSid = TargetSid;\nGroupCreated\n| join (\nGroupAddition\n) on GroupSid \n| extend timestamp = GroupCreateTime, AccountCustomEntity = GroupCreateSubjectAccount, HostCustomEntity = GroupCreateComputer",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "PrivilegeEscalation"
+                ],
+                "alertRuleTemplateName": "a7564d76-ec6b-4519-a66b-fcc80c42332b",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            },
+                            {
+                                "identifier": "Sid",
+                                "columnName": "GroupCreateSubjectUserSid"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

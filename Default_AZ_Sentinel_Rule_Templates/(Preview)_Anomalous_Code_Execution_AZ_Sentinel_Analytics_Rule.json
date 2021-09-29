@@ -1,0 +1,51 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8595d264-2f64-442d-b293-4e16dffc9882')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8595d264-2f64-442d-b293-4e16dffc9882')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Anomaly",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "alertRuleTemplateName": "8595d264-2f64-442d-b293-4e16dffc9882",
+                "displayName": "(Preview) Anomalous Code Execution",
+                "enabled": true,
+                "tactics": [
+                    "Execution"
+                ],
+                "anomalyVersion": "1.0.0",
+                "techniques": [
+                    "T1059"
+                ],
+                "frequency": "P1D",
+                "ruleStatus": "Production",
+                "isDefaultRule": true,
+                "anomalyRuleVersion": 0,
+                "customizableObservations": {
+                    "multiSelectObservations": null,
+                    "singleSelectObservations": null,
+                    "prioritizeExcludeObservations": null,
+                    "thresholdObservations": [
+                        {
+                            "minimum": "0",
+                            "maximum": "1",
+                            "value": "0",
+                            "name": "Anomaly score threshold",
+                            "description": "Generate an anomaly when the anomaly score is greater than the chosen value.",
+                            "sequenceNumber": 0,
+                            "rerun": "RerunAlways"
+                        }
+                    ],
+                    "singleValueObservations": null
+                }
+            }
+        }
+    ]
+}

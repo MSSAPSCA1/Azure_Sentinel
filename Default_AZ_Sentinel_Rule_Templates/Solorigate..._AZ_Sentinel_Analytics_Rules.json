@@ -1,0 +1,308 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/d75c628e-0bfd-4f9d-82cb-d7c7d088a692')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/d75c628e-0bfd-4f9d-82cb-d7c7d088a692')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Solorigate Defender Detections",
+                "description": "Surfaces any Defender Alert for Solorigate Events. In Azure Sentinel the SecurityAlerts table includes only the Device Name of the affected device, this query joins the DeviceInfo table to clearly connect other information such as \n Device group, ip, logged on users etc. This way, the Sentinel user can have all the pertinent device info in one view for all the the Solarigate Defender alerts.",
+                "severity": "High",
+                "enabled": true,
+                "query": "DeviceInfo\n| extend DeviceName = tolower(DeviceName)\n| join (SecurityAlert\n| where ProviderName =~ \"MDATP\"\n| extend ThreatName = tostring(parse_json(ExtendedProperties).ThreatName)\n| where ThreatName has \"Solorigate\"\n| extend HostCustomEntity = tolower(CompromisedEntity)\n) on $left.DeviceName == $right.HostCustomEntity\n| project TimeGenerated, DisplayName, ThreatName, CompromisedEntity, PublicIP, MachineGroup, AlertSeverity, Description, LoggedOnUsers, DeviceId, TenantId, HostCustomEntity\n| extend timestamp = TimeGenerated, IPCustomEntity = PublicIP",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "e70fa6e0-796a-4e85-9420-98b17b0bb749",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/f74447e2-67eb-4ce4-9196-2fbe520291ab')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/f74447e2-67eb-4ce4-9196-2fbe520291ab')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Solorigate Domains Found in VM Insights",
+                "description": "Identifies connections to Solorigate-related DNS records based on VM insights data",
+                "severity": "High",
+                "enabled": true,
+                "query": "let domains = dynamic([\"incomeupdate.com\",\"zupertech.com\",\"databasegalore.com\",\"panhardware.com\",\"avsvmcloud.com\",\"digitalcollege.org\",\"freescanonline.com\",\"deftsecurity.com\",\"thedoccloud.com\",\"virtualdataserver.com\",\"lcomputers.com\",\"webcodez.com\",\"globalnetworkissues.com\",\"kubecloud.com\",\"seobundlekit.com\",\"solartrackingsystem.net\",\"virtualwebdata.com\"]);\nlet timeframe = 1h;\nlet connections = VMConnection \n    | where TimeGenerated >= ago(timeframe)\n    | extend DNSName = set_union(todynamic(RemoteDnsCanonicalNames),todynamic(RemoteDnsQuestions))\n    | mv-expand DNSName\n    | where isnotempty(DNSName)\n    | where DNSName has_any (domains)\n    | extend IPCustomEntity = RemoteIp\n    | summarize TimeGenerated = arg_min(TimeGenerated, *), requests = count() by IPCustomEntity, DNSName = tostring(DNSName), AgentId, Machine, Process;\nlet processes = VMProcess\n    | where TimeGenerated >= ago(timeframe)\n    | project AgentId, Machine, Process, UserName, UserDomain, ExecutablePath, CommandLine, FirstPid\n    | extend exePathArr = split(ExecutablePath, \"\\\\\")\n    | extend DirectoryName = array_strcat(array_slice(exePathArr, 0, array_length(exePathArr) - 2), \"\\\\\")\n    | extend Filename = array_strcat(array_slice(exePathArr, array_length(exePathArr) - 1, array_length(exePathArr)), \"\\\\\")\n    | project-away exePathArr;\nlet computers = VMComputer\n    | where TimeGenerated >= ago(timeframe)\n    | project HostCustomEntity = HostName, AzureResourceId = _ResourceId, AgentId, Machine;\nconnections | join kind = inner (processes) on AgentId, Machine, Process\n            | join kind = inner (computers) on AgentId, Machine",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CommandAndControl"
+                ],
+                "alertRuleTemplateName": "ab4b6944-a20d-42ab-8b63-238426525801",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "DNS",
+                        "fieldMappings": [
+                            {
+                                "identifier": "DomainName",
+                                "columnName": "DNSName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Process",
+                        "fieldMappings": [
+                            {
+                                "identifier": "ProcessId",
+                                "columnName": "FirstPid"
+                            },
+                            {
+                                "identifier": "CommandLine",
+                                "columnName": "CommandLine"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "File",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Directory",
+                                "columnName": "DirectoryName"
+                            },
+                            {
+                                "identifier": "Name",
+                                "columnName": "Filename"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/90c26b2a-2f98-4ecd-927e-ecf1333fea6f')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/90c26b2a-2f98-4ecd-927e-ecf1333fea6f')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Solorigate Named Pipe",
+                "description": "Identifies a match across various data feeds for named pipe IOCs related to the Solorigate incident.",
+                "severity": "High",
+                "enabled": true,
+                "query": "(union isfuzzy=true\n(Event\n| where Source == \"Microsoft-Windows-Sysmon\"\n| where EventID in (17,18)\n| extend EvData = parse_xml(EventData)\n| extend EventDetail = EvData.DataItem.EventData.Data\n| extend NamedPipe = EventDetail.[5].[\"#text\"]\n| extend ProcessDetail = EventDetail.[6].[\"#text\"]\n| where NamedPipe contains '583da945-62af-10e8-4902-a8f205c72b2e'\n| extend Account = UserName\n| project-away EventDetail, EvData\n),\n(\n SecurityEvent\n| where EventID == '5145'\n| where AccessList has '%%4418'     // presence of CreatePipeInstance value \n| where RelativeTargetName contains '583da945-62af-10e8-4902-a8f205c72b2e'\n)\n)\n| extend timestamp = TimeGenerated",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "LateralMovement"
+                ],
+                "alertRuleTemplateName": "11b4c19d-2a79-4da3-af38-b067e1273dee",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Account"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Computer"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/1bf977ae-3937-4cf1-a1c7-379f8f6bf645')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/1bf977ae-3937-4cf1-a1c7-379f8f6bf645')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Solorigate Network Beacon",
+                "description": "Identifies a match across various data feeds for domains IOCs related to the Solorigate incident.\n References: https://blogs.microsoft.com/on-the-issues/2020/12/13/customers-protect-nation-state-cyberattacks/, \n https://www.fireeye.com/blog/threat-research/2020/12/evasive-attacker-leverages-solarwinds-supply-chain-compromises-with-sunburst-backdoor.html?1",
+                "severity": "High",
+                "enabled": true,
+                "query": "let domains = dynamic([\"incomeupdate.com\",\"zupertech.com\",\"databasegalore.com\",\"panhardware.com\",\"avsvmcloud.com\",\"digitalcollege.org\",\"freescanonline.com\",\"deftsecurity.com\",\"thedoccloud.com\",\"virtualdataserver.com\",\"lcomputers.com\",\"webcodez.com\",\"globalnetworkissues.com\",\"kubecloud.com\",\"seobundlekit.com\",\"solartrackingsystem.net\",\"virtualwebdata.com\"]);\n(union isfuzzy=true\n(CommonSecurityLog \n  | parse Message with * '(' DNSName ')' * \n  | where DNSName in~ (domains) or DestinationHostName has_any (domains) or RequestURL has_any(domains)\n  | extend AccountCustomEntity = SourceUserID, HostCustomEntity = DeviceName, IPCustomEntity = SourceIP\n  ),\n(DnsEvents \n  | extend DNSName = Name\n  | where isnotempty(DNSName)\n  | where DNSName has_any (domains)\n  | extend IPCustomEntity = ClientIP\n  ),\n(imDns \n  | where isnotempty(DnsQuery)\n  | where DnsQuery has_any (domains)\n  | extend DNSName = DnsQuery\n  | extend IPCustomEntity = SrcIpAddr\n  ),\n(VMConnection \n  | parse RemoteDnsCanonicalNames with * '[\"' DNSName '\"]' *\n  | where isnotempty(DNSName)\n  | where DNSName in~ (domains)\n  | extend IPCustomEntity = RemoteIp\n  ),\n(DeviceNetworkEvents \n  | where isnotempty(RemoteUrl) \n  | where RemoteUrl  has_any (domains)  \n  | extend DNSName = RemoteUrl\n  | extend IPCustomEntity = RemoteIP \n  | extend HostCustomEntity = DeviceName \n  ),\n(AzureDiagnostics\n  | where ResourceType == \"AZUREFIREWALLS\"\n  | where Category == \"AzureFirewallDnsProxy\"\n  | parse msg_s with \"DNS Request: \" ClientIP \":\" ClientPort \" - \" QueryID \" \" Request_Type \" \" Request_Class \" \" Request_Name \". \" Request_Protocol \" \" Request_Size \" \" EDNSO_DO \" \" EDNS0_Buffersize \" \" Responce_Code \" \" Responce_Flags \" \" Responce_Size \" \" Response_Duration\n  | where Request_Name has_any (domains)  \n  | extend DNSName = Request_Name\n  | extend IPCustomEntity = ClientIP \n  ),\n(AzureDiagnostics \n  | where ResourceType == \"AZUREFIREWALLS\"\n  | where Category == \"AzureFirewallApplicationRule\"\n  | parse msg_s with Protocol 'request from ' SourceHost ':' SourcePort 'to ' DestinationHost ':' DestinationPort '. Action:' Action\n  | where isnotempty(DestinationHost)\n  | where DestinationHost has_any (domains)  \n  | extend DNSName = DestinationHost \n  | extend IPCustomEntity = SourceHost\n  ) \n  )",
+                "queryFrequency": "PT6H",
+                "queryPeriod": "PT6H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CommandAndControl"
+                ],
+                "alertRuleTemplateName": "cecdbd4c-4902-403c-8d4b-32eb1efe460b",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "DNS",
+                        "fieldMappings": [
+                            {
+                                "identifier": "DomainName",
+                                "columnName": "DNSName"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

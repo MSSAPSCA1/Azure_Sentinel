@@ -1,0 +1,81 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/66834982-9fef-4711-8320-8b99829e12c1')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/66834982-9fef-4711-8320-8b99829e12c1')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Microsoft COVID-19 file hash indicator matches",
+                "description": "Identifies a match in CommonSecurityLog Event data from any FileHash published in the Microsoft COVID-19 Threat Intel Feed - as described at https://www.microsoft.com/security/blog/2020/05/14/open-sourcing-covid-threat-intelligence/",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let dt_lookBack = 1h;\nlet covidIndicators = (externaldata(TimeGenerated:datetime, FileHashValue:string, FileHashType: string, TlpLevel: string, Product: string, ThreatType: string, Description: string )\n[@\"https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/Sample%20Data/Feeds/Microsoft.Covid19.Indicators.csv\"] with (format=\"csv\"));\nlet fileHashIndicators = covidIndicators\n| where isnotempty(FileHashValue);\n// Handle matches against both lower case and uppercase versions of the hash:\n( fileHashIndicators | extend FileHashValue = tolower(FileHashValue)\n  | union (fileHashIndicators | extend FileHashValue = toupper(FileHashValue)))\n|  join (\n   CommonSecurityLog | where TimeGenerated >= ago(dt_lookBack) \n   | where isnotempty(FileHash)\n   | extend CommonSecurityLog_TimeGenerated = TimeGenerated\n)\non $left.FileHashValue == $right.FileHash\n| summarize LatestIndicatorTime = arg_max(TimeGenerated, *) by FileHashValue\n| project LatestIndicatorTime, FileHashValue, FileHashType, Description, ThreatType,  \nCommonSecurityLog_TimeGenerated, SourceIP, SourcePort, DestinationIP, DestinationPort, SourceUserID, SourceUserName, DeviceName, DeviceAction, \nRequestURL, DestinationUserName, DestinationUserID, ApplicationProtocol, Activity\n| extend timestamp = CommonSecurityLog_TimeGenerated, IPCustomEntity = SourceIP, HostCustomEntity = DeviceName, AccountCustomEntity = SourceUserName",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Impact"
+                ],
+                "alertRuleTemplateName": "2be4ef67-a93f-4d8a-981a-88158cb73abd",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

@@ -1,0 +1,63 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/c77193af-ee5a-4d42-8c84-3766e2e1e56e')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/c77193af-ee5a-4d42-8c84-3766e2e1e56e')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "GitHub Signin Burst from Multiple Locations",
+                "description": "This alerts when there Signin burst from multiple locations in GitHub (AAD SSO).",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let aadFunc = (tableName:string){\ntable(tableName)\n| where AppDisplayName == \"GitHub.com\"\n| where ResultType == 0\n| summarize CountOfLocations = dcount(Location), Locations = make_set(Location), BurstStartTime = min(TimeGenerated), BurstEndTime = max(TimeGenerated) by UserPrincipalName, Type\n| where CountOfLocations > 1\n| extend timestamp = BurstStartTime, AccountCustomEntity = UserPrincipalName\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "d3980830-dd9d-40a5-911f-76b44dfdce16",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

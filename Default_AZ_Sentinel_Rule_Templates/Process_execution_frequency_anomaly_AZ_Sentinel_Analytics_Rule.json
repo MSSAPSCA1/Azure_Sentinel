@@ -1,0 +1,72 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/fd8a6809-c31f-44a5-8896-9f5d7aa8349f')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/fd8a6809-c31f-44a5-8896-9f5d7aa8349f')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Process execution frequency anomaly",
+                "description": "Identifies anomalous spike in frequency of executions of sensitive processes which are often leveraged as attack vectors.\nThe query leverages KQL built-in anomaly detection algorithms to find large deviations from baseline patterns.\nSudden increases in execution frequency of sensitive processes should be further investigated for malicious activity.\nTune the values from 1.5 to 3 in series_decompose_anomalies for further outliers or based on custom threshold values for score.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let starttime = 14d;\nlet endtime = 1d;\nlet timeframe = 1h;\nlet TotalEventsThreshold = 5;\nlet ExeList = dynamic([\"powershell.exe\",\"cmd.exe\",\"wmic.exe\",\"psexec.exe\",\"cacls.exe\",\"rundll.exe\"]);\nlet TimeSeriesData =\nSecurityEvent\n| where EventID == 4688 | extend Process = tolower(Process)\n| where TimeGenerated between (startofday(ago(starttime))..startofday(ago(endtime)))\n| where Process in (ExeList)\n| project TimeGenerated, Computer, AccountType, Account, Process\n| make-series Total=count() on TimeGenerated from ago(starttime) to ago(endtime) step timeframe by Process;\nlet TimeSeriesAlerts = materialize(TimeSeriesData\n| extend (anomalies, score, baseline) = series_decompose_anomalies(Total, 1.5, -1, 'linefit')\n| mv-expand Total to typeof(double), TimeGenerated to typeof(datetime), anomalies to typeof(double), score to typeof(double), baseline to typeof(long)\n| where anomalies > 0\n| project Process, TimeGenerated, Total, baseline, anomalies, score\n| where Total > TotalEventsThreshold);\nlet AnomalyHours = materialize(TimeSeriesAlerts  | where TimeGenerated > ago(2d) | project TimeGenerated);\nTimeSeriesAlerts\n| where TimeGenerated > ago(2d)\n| join (\nSecurityEvent\n| where TimeGenerated between (startofday(ago(starttime))..startofday(ago(endtime)))\n| extend DateHour = bin(TimeGenerated, 1h) // create a new column and round to hour\n| where DateHour in ((AnomalyHours)) //filter the dataset to only selected anomaly hours\n| where EventID == 4688 | extend Process = tolower(Process)\n| summarize CommandlineCount = count() by bin(TimeGenerated, 1h), Process, CommandLine, Computer, Account\n) on Process, TimeGenerated\n| project AnomalyHour = TimeGenerated, Computer, Account, Process, CommandLine, CommandlineCount, Total, baseline, anomalies, score\n| extend timestamp = AnomalyHour, AccountCustomEntity = Account, HostCustomEntity = Computer",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Execution"
+                ],
+                "alertRuleTemplateName": "2c55fe7a-b06f-4029-a5b9-c54a2320d7b8",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

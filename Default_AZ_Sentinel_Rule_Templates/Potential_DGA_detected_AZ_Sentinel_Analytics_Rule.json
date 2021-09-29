@@ -1,0 +1,63 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/bb306211-0ede-4e08-b538-d3e8fd714253')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/bb306211-0ede-4e08-b538-d3e8fd714253')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Potential DGA detected",
+                "description": "Identifies clients with a high NXDomain count which could be indicative of a DGA (cycling through possible C2 domains\nwhere most C2s are not live). Alert is generated when a new IP address is seen (based on not being seen associated with \nNXDomain records in prior 10-day baseline period).",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let starttime = 10d;\nlet endtime = 1d;\nlet threshold = 100;\nlet nxDomainDnsEvents = DnsEvents \n| where ResultCode == 3 \n| where QueryType in (\"A\", \"AAAA\")\n| where ipv4_is_match(\"127.0.0.1\", ClientIP) == False\n| where Name !contains \"/\"\n| where Name contains \".\";\nnxDomainDnsEvents\n| where TimeGenerated > ago(endtime)\n| extend sld = tostring(split(Name, \".\")[-2])\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), dcount(sld) by ClientIP\n| where dcount_sld > threshold\n// Filter out previously seen IPs\n| join kind=leftanti (nxDomainDnsEvents\n    | where TimeGenerated between(ago(starttime)..ago(endtime))\n    | extend sld = tostring(split(Name, \".\")[-2])\n    | summarize dcount(sld) by ClientIP\n    | where dcount_sld > threshold ) on ClientIP\n// Pull out sample NXDomain responses for those remaining potentially infected IPs\n| join kind = inner (nxDomainDnsEvents | summarize by Name, ClientIP) on ClientIP\n| summarize StartTimeUtc = min(StartTimeUtc), EndTimeUtc = max(EndTimeUtc), sampleNXDomainList=make_list(Name, 100)  by ClientIP, dcount_sld\n| extend timestamp = StartTimeUtc, IPCustomEntity = ClientIP",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P10D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CommandAndControl"
+                ],
+                "alertRuleTemplateName": "a0907abe-6925-4d90-af2b-c7e89dc201a6",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

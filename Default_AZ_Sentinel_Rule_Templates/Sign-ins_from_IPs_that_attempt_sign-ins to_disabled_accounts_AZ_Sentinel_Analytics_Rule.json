@@ -1,0 +1,64 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/b595eb8c-c788-4d27-a702-4f98b8e6586e')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/b595eb8c-c788-4d27-a702-4f98b8e6586e')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Sign-ins from IPs that attempt sign-ins to disabled accounts",
+                "description": "Identifies IPs with failed attempts to sign in to one or more disabled accounts signed in successfully to another account.\nReferences: https://docs.microsoft.com/azure/active-directory/reports-monitoring/reference-sign-ins-error-codes\n50057 - User account is disabled. The account has been disabled by an administrator.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let aadFunc = (tableName:string){\ntable(tableName)\n| where ResultType == \"50057\" \n| where ResultDescription == \"User account is disabled. The account has been disabled by an administrator.\" \n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), disabledAccountLoginAttempts = count(), \ndisabledAccountsTargeted = dcount(UserPrincipalName), applicationsTargeted = dcount(AppDisplayName), disabledAccountSet = makeset(UserPrincipalName), \napplicationSet = makeset(AppDisplayName) by IPAddress, Type\n| order by disabledAccountLoginAttempts desc\n| join kind= leftouter (\n    // Consider these IPs suspicious - and alert any related  successful sign-ins\n    SigninLogs\n    | where ResultType == 0\n    | summarize successfulAccountSigninCount = dcount(UserPrincipalName), successfulAccountSigninSet = makeset(UserPrincipalName, 15) by IPAddress, Type\n    // Assume IPs associated with sign-ins from 100+ distinct user accounts are safe\n    | where successfulAccountSigninCount < 100\n) on IPAddress  \n// IPs from which attempts to authenticate as disabled user accounts originated, and had a non-zero success rate for some other account\n| where isnotempty(successfulAccountSigninCount)\n| project StartTime, EndTime, IPAddress, disabledAccountLoginAttempts, disabledAccountsTargeted, disabledAccountSet, applicationSet, \nsuccessfulAccountSigninCount, successfulAccountSigninSet, Type\n| order by disabledAccountLoginAttempts\n| extend timestamp = StartTime, IPCustomEntity = IPAddress\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nunion isfuzzy=true aadSignin, aadNonInt",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess",
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "500c103a-0319-4d56-8e99-3cec8d860757",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

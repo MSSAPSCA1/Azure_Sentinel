@@ -1,0 +1,74 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/eeecd613-026c-4a69-82b7-73a886a4f93f')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/eeecd613-026c-4a69-82b7-73a886a4f93f')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "New UserAgent observed in last 24 hours",
+                "description": "Identifies new UserAgents observed in the last 24 hours versus the previous 14 days. This detection\nextracts words from user agents to build the baseline and determine rareity rather than perform a\ndirect comparison. This avoids FPs caused by version numbers and other high entropy user agent components.\nThese new UserAgents could be benign. However, in normally stable environments,\nthese new UserAgents could provide a starting point for investigating malicious activity.\nNote: W3CIISLog can be noisy depending on the environment, however OfficeActivity and AWSCloudTrail are\nusually stable with low numbers of detections.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let starttime = 14d;\nlet endtime = 1d;\nlet UserAgentAll =\n(union isfuzzy=true\n(OfficeActivity\n| where TimeGenerated >= ago(starttime)\n| where isnotempty(UserAgent)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by UserAgent, SourceIP = ClientIP, Account = UserId, Type, RecordType, Operation\n),\n(\nW3CIISLog\n| where TimeGenerated >= ago(starttime)\n| where isnotempty(csUserAgent)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by UserAgent = csUserAgent, SourceIP = cIP, Account = csUserName, Type, sSiteName, csMethod, csUriStem\n),\n(\nAWSCloudTrail\n| where TimeGenerated >= ago(starttime)\n| where isnotempty(UserAgent)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by UserAgent, SourceIP = SourceIpAddress, Account = UserIdentityUserName, Type, EventSource, EventName\n))\n// remove wordSize blocks of non-numeric hex characters prior to word extraction\n| extend UserAgentNoHexAlphas = replace(\"([A-Fa-f]{4,})\", \"x\", UserAgent)\n// once blocks of hex chars are removed, extract wordSize blocks of a-z\n| extend Tokens = extract_all(\"([A-Za-z]{4,})\", UserAgentNoHexAlphas)\n// concatenate extracted words to create a summarized user agent for baseline and comparison\n| extend NormalizedUserAgent = strcat_array(Tokens, \"|\")\n| project-away UserAgentNoHexAlphas, Tokens;\nUserAgentAll\n| where StartTime >= ago(endtime)\n| summarize StartTime = min(StartTime), EndTime = max(EndTime), count() by UserAgent, NormalizedUserAgent, SourceIP, Account, Type, RecordType, Operation, EventSource, EventName, sSiteName, csMethod, csUriStem\n| join kind=leftanti\n(\nUserAgentAll\n| where StartTime < ago(endtime)\n| summarize by NormalizedUserAgent, SourceIP, Account, Type, RecordType, Operation, EventSource, EventName, sSiteName, csMethod, csUriStem\n)\non NormalizedUserAgent\n| extend timestamp = StartTime, IPCustomEntity = SourceIP, AccountCustomEntity = Account",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess",
+                    "CommandAndControl",
+                    "Execution"
+                ],
+                "alertRuleTemplateName": "b725d62c-eb77-42ff-96f6-bdc6745fc6e0",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

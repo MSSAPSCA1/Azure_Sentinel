@@ -1,0 +1,329 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/d651718f-7764-4368-bf22-33549cc36e83')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/d651718f-7764-4368-bf22-33549cc36e83')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Rare and potentially high-risk Office operations",
+                "description": "Identifies Office operations that are typically rare and can provide capabilities useful to attackers.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "OfficeActivity\n| where Operation in~ ( \"Add-MailboxPermission\", \"Add-MailboxFolderPermission\", \"Set-Mailbox\", \"New-ManagementRoleAssignment\")\nand not(UserId has_any ('NT AUTHORITY\\\\SYSTEM (Microsoft.Exchange.ServiceHost)','devilfish-applicationaccount') and Operation in~ ( \"Add-MailboxPermission\", \"Set-Mailbox\"))\n| extend timestamp = TimeGenerated, AccountCustomEntity = UserId, IPCustomEntity = ClientIP",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "Collection"
+                ],
+                "alertRuleTemplateName": "957cb240-f45d-4491-9ba5-93430a3c08be",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/3c9de8f0-0f86-45f8-811d-946164b1f624')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/3c9de8f0-0f86-45f8-811d-946164b1f624')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Rare application consent",
+                "description": "This will alert when the \"Consent to application\" operation occurs by a user that has not done this operation before or rarely does this.\nThis could indicate that permissions to access the listed Azure App were provided to a malicious actor. \nConsent to application, Add service principal and Add OAuth2PermissionGrant should typically be rare events. \nThis may help detect the Oauth2 attack that can be initiated by this publicly available tool - https://github.com/fireeye/PwnAuth\nFor further information on AuditLogs please see https://docs.microsoft.com/azure/active-directory/reports-monitoring/reference-audit-activities.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let current = 1d;\nlet auditLookback = 7d;\n// Setting threshold to 3 as a default, change as needed.  \n// Any operation that has been initiated by a user or app more than 3 times in the past 7 days will be excluded\nlet threshold = 3;\n// Gather initial data from lookback period, excluding current, adjust current to more than a single day if no results\nlet AuditTrail = AuditLogs | where TimeGenerated >= ago(auditLookback) and TimeGenerated < ago(current)\n// 2 other operations that can be part of malicious activity in this situation are \n// \"Add OAuth2PermissionGrant\" and \"Add service principal\", extend the filter below to capture these too\n| where OperationName has \"Consent to application\"\n| extend InitiatedBy = iff(isnotempty(tostring(parse_json(tostring(InitiatedBy.user)).userPrincipalName)), \ntostring(parse_json(tostring(InitiatedBy.user)).userPrincipalName), tostring(parse_json(tostring(InitiatedBy.app)).displayName))\n| extend TargetResourceName = tolower(tostring(TargetResources.[0].displayName))\n| summarize max(TimeGenerated), OperationCount = count() by OperationName, InitiatedBy, TargetResourceName\n// only including operations by initiated by a user or app that is above the threshold so we produce only rare and has not occurred in last 7 days\n| where OperationCount > threshold\n;\n// Gather current period of audit data\nlet RecentConsent = AuditLogs | where TimeGenerated >= ago(current)\n| where OperationName has \"Consent to application\"\n| extend IpAddress = case(\nisnotempty(tostring(parse_json(tostring(InitiatedBy.user)).ipAddress)) and tostring(parse_json(tostring(InitiatedBy.user)).ipAddress) != 'null', tostring(parse_json(tostring(InitiatedBy.user)).ipAddress), \nisnotempty(tostring(parse_json(tostring(InitiatedBy.app)).ipAddress)) and tostring(parse_json(tostring(InitiatedBy.app)).ipAddress) != 'null', tostring(parse_json(tostring(InitiatedBy.app)).ipAddress),\n'Not Available')\n| extend InitiatedBy = iff(isnotempty(tostring(parse_json(tostring(InitiatedBy.user)).userPrincipalName)), \ntostring(parse_json(tostring(InitiatedBy.user)).userPrincipalName), tostring(parse_json(tostring(InitiatedBy.app)).displayName))\n| extend TargetResourceName = tolower(tostring(TargetResources.[0].displayName))\n| parse TargetResources.[0].modifiedProperties with * \"ConsentType: \" ConsentType \"]\" *\n| mv-expand AdditionalDetails\n| extend UserAgent = iff(AdditionalDetails.key == \"User-Agent\",tostring(AdditionalDetails.value),\"\")\n| project TimeGenerated, InitiatedBy, IpAddress, TargetResourceName, Category, OperationName, ConsentType, UserAgent, CorrelationId, Type;\n// Exclude previously seen audit activity for \"Consent to application\" that was seen in the lookback period\n// First for rare InitiatedBy\nlet RareConsentBy = RecentConsent | join kind= leftanti AuditTrail on OperationName, InitiatedBy \n| extend Reason = \"Previously unseen user consenting\";\n// Second for rare TargetResourceName\nlet RareConsentApp = RecentConsent | join kind= leftanti AuditTrail on OperationName, TargetResourceName\n| extend Reason = \"Previously unseen app granted consent\";\nRareConsentBy | union RareConsentApp\n| summarize Reason = makeset(Reason) by TimeGenerated, InitiatedBy, IpAddress, TargetResourceName, Category, OperationName, ConsentType, UserAgent, CorrelationId, Type\n| extend timestamp = TimeGenerated, AccountCustomEntity = InitiatedBy, HostCustomEntity = TargetResourceName, IPCustomEntity = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P7D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 3,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "LateralMovement",
+                    "Collection"
+                ],
+                "alertRuleTemplateName": "83ba3057-9ea3-4759-bf6a-933f2e5bc7ee",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/9e476094-bb65-463f-82c2-50f47a8a2921')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/9e476094-bb65-463f-82c2-50f47a8a2921')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Rare client observed with high reverse DNS lookup count",
+                "description": "Identifies clients with a high reverse DNS counts which could be carrying out reconnaissance or discovery activity.\nAlert is generated if the IP performing such reverse DNS lookups was not seen doing so in the preceding 7-day period.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let starttime = 8d;\nlet endtime = 1d;\nlet threshold = 10;\nDnsEvents \n| where TimeGenerated > ago(endtime)\n| where Name contains \"in-addr.arpa\" \n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), dcount(Name) by ClientIP\n| where dcount_Name > threshold\n| project StartTimeUtc, EndTimeUtc, ClientIP , dcount_Name \n| join kind=leftanti (DnsEvents \n    | where TimeGenerated between(ago(starttime)..ago(endtime))\n    | where Name contains \"in-addr.arpa\" \n    | summarize dcount(Name) by ClientIP, bin(TimeGenerated, 1d)\n    | where dcount_Name > threshold\n    | project ClientIP , dcount_Name \n) on ClientIP\n| extend timestamp = StartTimeUtc, IPCustomEntity = ClientIP",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P8D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Discovery"
+                ],
+                "alertRuleTemplateName": "15ae38a2-2e29-48f7-883f-863fb25a5a06",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/506139ef-5ebe-4170-a17c-8f307fcce9c8')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/506139ef-5ebe-4170-a17c-8f307fcce9c8')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Rare RDP Connections",
+                "description": "Identifies when an RDP connection is new or rare related to any logon type by a given account today based on comparison with the previous 14 days.\nRDP connections are indicated by the EventID 4624 with LogonType = 10",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let starttime = 14d;\nlet endtime = 1d;\nSecurityEvent\n| where TimeGenerated >= ago(endtime) \n| where EventID == 4624 and LogonType == 10\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), ConnectionCount = count() \nby Account = tolower(Account), Computer = toupper(Computer), IpAddress, AccountType, Activity, LogonTypeName, ProcessName\n// use left anti to exclude anything from the previous 14 days that is not rare\n| join kind=leftanti (\nSecurityEvent\n| where TimeGenerated between (ago(starttime) .. ago(endtime))\n| where EventID == 4624\n| summarize by Computer = toupper(Computer), IpAddress, Account = tolower(Account)\n) on Account, Computer\n| summarize StartTime = min(StartTime), EndTime = max(EndTime), ConnectionCount = sum(ConnectionCount)  \nby Account, Computer, IpAddress, AccountType, Activity, LogonTypeName, ProcessName\n| extend timestamp = StartTime, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "LateralMovement"
+                ],
+                "alertRuleTemplateName": "45b903c5-6f56-4969-af10-ae62ac709718",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/4d61101f-464c-4ec3-8473-c9c9d9a3c4c8')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/4d61101f-464c-4ec3-8473-c9c9d9a3c4c8')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Rare subscription-level operations in Azure",
+                "description": "This query looks for a few sensitive subscription-level events based on Azure Activity Logs. \n For example this monitors for the operation name 'Create or Update Snapshot' which is used for creating backups but could be misused by attackers \n to dump hashes or extract sensitive information from the disk.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let starttime = 14d;\nlet endtime = 1d;\n// The number of operations below which an IP address is considered an unusual source of role assignment operations\nlet alertOperationThreshold = 5;\nlet SensitiveOperationList = dynamic(\n[\"List keys\", \"List Storage Account Keys\", \"Register Subscription\", \"Create or Update Snapshot\", \"Create or Update Network Security Group\"]);\nlet SensitiveActivity = AzureActivity\n| where OperationNameValue in~ (SensitiveOperationList)\n| where ActivityStatusValue =~ \"Succeeded\";\nSensitiveActivity\n| where TimeGenerated between (ago(starttime) .. ago(endtime))\n| summarize count() by CallerIpAddress, Caller\n| where count_ >= alertOperationThreshold\n| join kind = rightanti ( \nSensitiveActivity\n| where TimeGenerated >= ago(endtime)\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), ActivityTimeStamp = makelist(TimeGenerated), ActivityStatusValue = makelist(ActivityStatusValue), \nOperationIds = makelist(OperationId), CorrelationIds = makelist(CorrelationId), Resources = makelist(Resource), ResourceGroups = makelist(ResourceGroup), ResourceIds = makelist(ResourceId), ActivityCountByCallerIPAddress = count()  \nby CallerIpAddress, Caller, OperationNameValue\n) on CallerIpAddress, Caller\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Caller, IPCustomEntity = CallerIpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CredentialAccess",
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "23de46ea-c425-4a77-b456-511ae4855d69",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

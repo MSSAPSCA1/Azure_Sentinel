@@ -1,0 +1,320 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/a9b6293c-748e-4a4d-93c8-79c0bb623af7')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/a9b6293c-748e-4a4d-93c8-79c0bb623af7')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "User account added to built in domain local or global group",
+                "description": "Identifies when a user account has been added to a privileged built in domain local group or global group \nsuch as the Enterprise Admins, Cert Publishers or DnsAdmins. Be sure to verify this is an expected addition.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "// For AD SID mappings - https://docs.microsoft.com/windows/security/identity-protection/access-control/active-directory-security-groups\nlet WellKnownLocalSID = \"S-1-5-32-5[0-9][0-9]$\";\nlet WellKnownGroupSID = \"S-1-5-21-[0-9]*-[0-9]*-[0-9]*-5[0-9][0-9]$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1102$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1103$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-498$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1000$\";\nSecurityEvent \n// When MemberName contains '-' this indicates addition of a group to a group\n| where AccountType == \"User\" and MemberName != \"-\"\n// 4728 - A member was added to a security-enabled global group\n// 4732 - A member was added to a security-enabled local group\n// 4756 - A member was added to a security-enabled universal group\n| where EventID in (4728, 4732, 4756)   \n| where TargetSid matches regex WellKnownLocalSID or TargetSid matches regex WellKnownGroupSID\n// Exclude Remote Desktop Users group: S-1-5-32-555\n| where TargetSid !in (\"S-1-5-32-555\")\n| extend SimpleMemberName = tostring(split(tostring(split(MemberName, \",\")[0]),\"=\")[1])\n| project StartTimeUtc = TimeGenerated, EventID, Activity, Computer, SimpleMemberName, MemberName, MemberSid, TargetUserName, TargetDomainName, TargetSid, UserPrincipalName, SubjectUserName, SubjectUserSid\n| extend timestamp = StartTimeUtc, AccountCustomEntity = SimpleMemberName, HostCustomEntity = Computer",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "PrivilegeEscalation"
+                ],
+                "alertRuleTemplateName": "a35f2c18-1b97-458f-ad26-e033af18eb99",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e44fabe5-d380-465a-8de5-32b17cd3d48f')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e44fabe5-d380-465a-8de5-32b17cd3d48f')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "User account created and deleted within 10 mins",
+                "description": "Identifies when a user account is created and then deleted within 10 minutes. This can be an indication of compromise and\nan adversary attempting to hide in the noise.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let timeframe = 1d;\nlet spanoftime = 10m;\nlet threshold = 0;\nSecurityEvent \n| where TimeGenerated > ago(2*timeframe) \n// A user account was created\n| where EventID == 4720\n| where AccountType =~ \"User\"\n| project creationTime = TimeGenerated, CreateEventID = EventID, CreateActivity = Activity, Computer, TargetUserName, UserPrincipalName, \nAccountUsedToCreate = SubjectAccount, SIDofAccountUsedToCreate = SubjectUserSid, TargetAccount = tolower(TargetAccount), TargetSid\n| join kind= inner (\n  SecurityEvent\n  | where TimeGenerated > ago(timeframe) \n  // A user account was deleted \n  | where EventID == 4726\n| where AccountType == \"User\"\n| project deletionTime = TimeGenerated, DeleteEventID = EventID, DeleteActivity = Activity, Computer, TargetUserName, UserPrincipalName, \nAccountUsedToDelete = SubjectAccount, SIDofAccountUsedToDelete = SubjectUserSid, TargetAccount = tolower(TargetAccount), TargetSid\n) on Computer, TargetAccount\n| where deletionTime - creationTime < spanoftime\n| extend TimeDelta = deletionTime - creationTime\n| where tolong(TimeDelta) >= threshold\n| project TimeDelta, creationTime, CreateEventID, CreateActivity, Computer, TargetAccount, TargetSid, UserPrincipalName, AccountUsedToCreate, SIDofAccountUsedToCreate,\ndeletionTime, DeleteEventID, DeleteActivity, AccountUsedToDelete, SIDofAccountUsedToDelete\n| extend timestamp = creationTime, AccountCustomEntity = AccountUsedToCreate, HostCustomEntity = Computer",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P2D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "PrivilegeEscalation"
+                ],
+                "alertRuleTemplateName": "4b93c5af-d20b-4236-b696-a28b8c51407f",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            },
+                            {
+                                "identifier": "Sid",
+                                "columnName": "SIDofAccountUsedToCreate"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/0f74dc26-b478-46a7-b0e5-9e15b7b0f272')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/0f74dc26-b478-46a7-b0e5-9e15b7b0f272')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "User account enabled and disabled within 10 mins",
+                "description": "Identifies when a user account is enabled and then disabled within 10 minutes. This can be an indication of compromise and\nan adversary attempting to hide in the noise.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let timeframe = 1d;\nlet spanoftime = 10m;\nlet threshold = 0;\nSecurityEvent \n| where TimeGenerated > ago(2*timeframe) \n// A user account was enabled\n| where EventID == 4722\n| where AccountType =~ \"User\"\n| where TargetAccount !hassuffix \"$\"\n| project EnableTime = TimeGenerated, EnableEventID = EventID, EnableActivity = Activity, Computer, UserPrincipalName, \nAccountUsedToEnable = SubjectAccount, SIDofAccountUsedToEnable = SubjectUserSid, TargetAccount = tolower(TargetAccount), TargetSid\n| join kind= inner (\n  SecurityEvent\n  | where TimeGenerated > ago(timeframe) \n  // A user account was disabled \n  | where EventID == 4725\n| where AccountType =~ \"User\"\n| project DisableTime = TimeGenerated, DisableEventID = EventID, DisableActivity = Activity, Computer, UserPrincipalName, \nAccountUsedToDisable = SubjectAccount, SIDofAccountUsedToDisable = SubjectUserSid, TargetAccount = tolower(TargetAccount), TargetSid\n) on Computer, TargetAccount\n| where DisableTime - EnableTime < spanoftime\n| extend TimeDelta = DisableTime - EnableTime\n| where tolong(TimeDelta) >= threshold\n| project TimeDelta, EnableTime, EnableEventID, EnableActivity, Computer, TargetAccount, TargetSid, UserPrincipalName, AccountUsedToEnable, SIDofAccountUsedToEnable, \nDisableTime, DisableEventID, DisableActivity, AccountUsedToDisable, SIDofAccountUsedToDisable\n| extend timestamp = EnableTime, AccountCustomEntity = AccountUsedToEnable, HostCustomEntity = Computer",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P2D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "PrivilegeEscalation"
+                ],
+                "alertRuleTemplateName": "3d023f64-8225-41a2-9570-2bd7c2c4535e",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            },
+                            {
+                                "identifier": "Sid",
+                                "columnName": "SIDofAccountUsedToEnable"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/be64611c-d171-4125-8c18-a570528e9518')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/be64611c-d171-4125-8c18-a570528e9518')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "User added to Azure Active Directory Privileged Groups",
+                "description": "This will alert when a user is added to any of the Privileged Groups.\nFor further information on AuditLogs please see https://docs.microsoft.com/azure/active-directory/reports-monitoring/reference-audit-activities.\nFor Administrator role permissions in Azure Active Directory please see https://docs.microsoft.com/azure/active-directory/users-groups-roles/directory-assign-admin-roles",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let OperationList = dynamic([\"Add member to role\",\"Add member to role in PIM requested (permanent)\"]);\nlet PrivilegedGroups = dynamic([\"UserAccountAdmins\",\"PrivilegedRoleAdmins\",\"TenantAdmins\"]);\nAuditLogs\n| where LoggedByService =~ \"Core Directory\"\n| where Category =~ \"RoleManagement\"\n| where OperationName in~ (OperationList)\n| mv-expand TargetResources\n| extend modProps = parse_json(TargetResources).modifiedProperties\n| mv-expand bagexpansion=array modProps\n| evaluate bag_unpack(modProps)\n| extend displayName = column_ifexists(\"displayName\", \"NotAvailable\"), newValue = column_ifexists(\"newValue\", \"NotAvailable\")\n| where displayName =~ \"Role.WellKnownObjectName\"\n| extend DisplayName = displayName, GroupName = replace('\"','',newValue)\n| extend initByApp = parse_json(InitiatedBy).app, initByUser = parse_json(InitiatedBy).user\n| extend AppId = initByApp.appId, \nInitiatedByDisplayName = case(isnotempty(initByApp.displayName), initByApp.displayName, isnotempty(initByUser.displayName), initByUser.displayName, \"not available\"),\nServicePrincipalId = tostring(initByApp.servicePrincipalId),\nServicePrincipalName = tostring(initByApp.servicePrincipalName),\nUserId = initByUser.id,\nUserIPAddress = initByUser.ipAddress,\nUserRoles = initByUser.roles,\nUserPrincipalName = tostring(initByUser.userPrincipalName)\n| where GroupName in~ (PrivilegedGroups)\n// If you want to still alert for operations from PIM, remove below filtering for MS-PIM.\n//| where InitiatedByDisplayName != \"MS-PIM\"\n| project TimeGenerated, AADOperationType, Category, OperationName, AADTenantId, AppId, InitiatedByDisplayName, ServicePrincipalId, ServicePrincipalName, DisplayName, GroupName, UserId, UserIPAddress, UserRoles, UserPrincipalName\n| extend timestamp = TimeGenerated, AccountCustomEntity = case(isnotempty(ServicePrincipalName), ServicePrincipalName, isnotempty(ServicePrincipalId), ServicePrincipalId, isnotempty(UserPrincipalName), UserPrincipalName, \"not available\")",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "PrivilegeEscalation"
+                ],
+                "alertRuleTemplateName": "4d94d4a9-dc96-410a-8dea-4d4d4584188b",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/6c0e285d-292f-41e2-aed6-e798ef273133')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/6c0e285d-292f-41e2-aed6-e798ef273133')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Users searching for VIP user activity",
+                "description": "This query monitors for users running Log Analytics queries that contain filters\nfor specific, defined VIP user accounts or the VIPUser watchlist template.\nUse this detection to alert for users specifically searching for activity of sensitive users.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "// Replace these with the username or emails of your VIP users you wish to monitor for.\nlet vips = dynamic(['vip1@email.com','vip2@email.com']);\n// Add users who are allowed to conduct these searches - this could be specific SOC team members\nlet allowed_users = dynamic([]);\nLAQueryLogs\n| where QueryText has_any (vips) or QueryText has_any ('_GetWatchlist(\"VIPUsers\")', \"_GetWatchlist('VIPUsers')\")\n| project TimeGenerated, AADEmail, RequestClientApp, QueryText, ResponseRowCount, RequestTarget\n| extend timestamp = TimeGenerated, AccountCustomEntity = AADEmail",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Collection",
+                    "Exfiltration"
+                ],
+                "alertRuleTemplateName": "f7f4a77e-f68f-4b56-9aaf-a0c9d87d7a8e",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "AzureResource",
+                        "fieldMappings": [
+                            {
+                                "identifier": "ResourceId",
+                                "columnName": "RequestTarget"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

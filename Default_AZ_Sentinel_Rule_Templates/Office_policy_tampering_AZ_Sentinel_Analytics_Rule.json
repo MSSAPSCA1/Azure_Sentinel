@@ -1,0 +1,73 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/752bc9f6-b68b-4e6d-8ef0-43613056efed')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/752bc9f6-b68b-4e6d-8ef0-43613056efed')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Office policy tampering",
+                "description": "Identifies if any tampering is done to either auditlog, ATP Safelink, SafeAttachment, AntiPhish or Dlp policy. \nAn adversary may use this technique to evade detection or avoid other policy based defenses.\nReferences: https://docs.microsoft.com/powershell/module/exchange/advanced-threat-protection/remove-antiphishrule?view=exchange-ps.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let opList = OfficeActivity \n| summarize by Operation\n//| where Operation startswith \"Remove-\" or Operation startswith \"Disable-\"\n| where Operation has_any (\"Remove\", \"Disable\")\n| where Operation contains \"AntiPhish\" or Operation contains \"SafeAttachment\" or Operation contains \"SafeLinks\" or Operation contains \"Dlp\" or Operation contains \"Audit\"\n| summarize make_set(Operation);\nOfficeActivity\n// Only admin or global-admin can disable/remove policy\n| where RecordType =~ \"ExchangeAdmin\"\n| where UserType in~ (\"Admin\",\"DcAdmin\")\n// Pass in interesting Operation list\n| where Operation in~ (opList)\n| extend ClientIPOnly = case( \nClientIP has \".\", tostring(split(ClientIP,\":\")[0]), \nClientIP has \"[\", tostring(trim_start(@'[[]',tostring(split(ClientIP,\"]\")[0]))),\nClientIP\n)  \n| extend Port = case(\nClientIP has \".\", (split(ClientIP,\":\")[1]),\nClientIP has \"[\", tostring(split(ClientIP,\"]:\")[1]),\nClientIP\n)\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), OperationCount = count() by Operation, UserType, UserId, ClientIP = ClientIPOnly, Port, ResultStatus, Parameters\n| extend timestamp = StartTimeUtc, AccountCustomEntity = UserId, IPCustomEntity = ClientIP",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "DefenseEvasion"
+                ],
+                "alertRuleTemplateName": "fbd72eb8-087e-466b-bd54-1ca6ea08c6d3",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

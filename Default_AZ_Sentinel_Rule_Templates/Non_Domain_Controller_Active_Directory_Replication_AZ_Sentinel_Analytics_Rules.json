@@ -1,0 +1,81 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/35a8580a-5336-4dc0-8ea2-cc7425d7eb7f')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/35a8580a-5336-4dc0-8ea2-cc7425d7eb7f')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Non Domain Controller Active Directory Replication",
+                "description": "This query detects potential attempts by non-computer accounts (non domain controllers) to retrieve/synchronize an active directory object leveraging directory replication services (DRS).\nA Domain Controller (computer account) would usually be performing these actions in a domain environment. Another detection rule can be created to cover domain controllers accounts doing at rare times.\nA domain user with privileged permissions to use directory replication services is rare. Ref: https://threathunterplaybook.com/notebooks/windows/06_credential_access/WIN-180815210510.html",
+                "severity": "High",
+                "enabled": true,
+                "query": "// Enter a reference list of hostnames for your DC servers\n//let DCServersList = dynamic ([\"DC01.simulandlabs.com\",\"DC02.simulandlabs.com\"]);\nSecurityEvent\n//| where Computer in (DCServersList)\n| where EventID == 4662 and ObjectServer == 'DS'\n| where AccountType != 'Machine'\n| where Properties has '1131f6aa-9c07-11d1-f79f-00c04fc2dcd2' //DS-Replication-Get-Changes\n    or Properties has '1131f6ad-9c07-11d1-f79f-00c04fc2dcd2' //DS-Replication-Get-Changes-All\n    or Properties has '89e95b76-444d-4c62-991a-0facbeda640c' //DS-Replication-Get-Changes-In-Filtered-Set\n| project TimeGenerated, Account, Activity, Properties, SubjectLogonId, Computer\n| join kind=inner\n(\n    SecurityEvent\n    //| where Computer in (DCServersList)\n    | where EventID == 4624 and LogonType == 3\n    | where AccountType != 'Machine'\n    | project TargetLogonId, IpAddress\n)\non $left.SubjectLogonId == $right.TargetLogonId\n| project-reorder TimeGenerated, Computer, Account, IpAddress\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer, SourceAddress = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P7D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "b9d2eebc-5dcb-4888-8165-900db44443ab",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "SourceAddress"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

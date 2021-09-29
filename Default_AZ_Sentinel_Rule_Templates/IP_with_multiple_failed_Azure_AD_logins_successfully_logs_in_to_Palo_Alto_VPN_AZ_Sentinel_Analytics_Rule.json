@@ -1,0 +1,82 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e007a45c-a785-4651-a671-e8f55f673a31')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e007a45c-a785-4651-a671-e8f55f673a31')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "IP with multiple failed Azure AD logins successfully logs in to Palo Alto VPN",
+                "description": "This query creates a list of IP addresses with a number failed login attempts to AAD \nabove a set threshold.  It then looks for any successful Palo Alto VPN logins from any\nof these IPs within the same timeframe.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "//Set a threshold of failed AAD signins from an IP address within 1 day above which we want to deem those logins suspicious.\nlet signin_threshold = 5; \n//Make a list of IPs with AAD signin failures above our threshold.\nlet aadFunc = (tableName:string){\nlet suspicious_signins = \n    table(tableName)\n    //Looking for logon failure results\n    | where ResultType !in (\"0\", \"50125\", \"50140\")\n    //Exclude localhost addresses to reduce the chance of FPs\n    | where IPAddress !in (\"127.0.0.1\", \"::1\")\n    | summarize count() by IPAddress\n    | where count_ >  signin_threshold\n    | summarize make_set(IPAddress);\n    suspicious_signins\n};\nlet aadSignin = aadFunc(\"SigninLogs\");\nlet aadNonInt = aadFunc(\"AADNonInteractiveUserSignInLogs\");\nlet suspicious_signins = \nunion isfuzzy=true aadSignin, aadNonInt\n| summarize make_set(set_IPAddress);\n//See if any of those IPs have sucessfully logged into PA VPNs during the same timeperiod\nCommonSecurityLog\n    //Select only PA VPN sucessful logons\n    | where DeviceVendor == \"Palo Alto Networks\" and DeviceEventClassID == \"globalprotect\"\n    | where Message has \"GlobalProtect gateway user authentication succeeded\"\n    //Parse out the logon source IP from the Message field to match on\n    | extend SourceIP = extract(\"Login from: ([^,]+)\", 1, Message) \n    | where SourceIP in (suspicious_signins)\n    | extend Reason = \"Multiple failed AAD logins from SourceIP\"\n    //Parse out other useful information from Message field\n    | extend User = extract('User name: ([^,]+)', 1, Message) \n    | extend ClientOS = extract('Client OS version: ([^,\\\"]+)', 1, Message)\n    | extend Location = extract('Source region: ([^,]{2})',1, Message)\n    | project TimeGenerated, Reason, SourceIP, User, ClientOS, Location, Message, DeviceName, ReceiptTime, DeviceVendor, DeviceEventClassID, Computer, FileName\n    | extend AccountCustomEntity = User, IPCustomEntity = SourceIP, timestamp = TimeGenerated, HostCustomEntity = DeviceName",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess",
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "ba144bf8-75b8-406f-9420-ed74397f9479",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

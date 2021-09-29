@@ -1,0 +1,82 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/7d4b7648-40e2-4b24-a24c-3857a2eb9558')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/7d4b7648-40e2-4b24-a24c-3857a2eb9558')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Malicious Inbox Rule",
+                "description": "Often times after the initial compromise the attackers create inbox rules to delete emails that contain certain keywords. \n This is done so as to limit ability to warn compromised users that they've been compromised. Below is a sample query that tries to detect this.\nReference: https://www.reddit.com/r/sysadmin/comments/7kyp0a/recent_phishing_attempts_my_experience_and_what/",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let Keywords = dynamic([\"helpdesk\", \" alert\", \" suspicious\", \"fake\", \"malicious\", \"phishing\", \"spam\", \"do not click\", \"do not open\", \"hijacked\", \"Fatal\"]);\nOfficeActivity\n| where Operation =~ \"New-InboxRule\"\n| where Parameters has \"Deleted Items\" or Parameters has \"Junk Email\" \n| extend Events=todynamic(Parameters)\n| parse Events  with * \"SubjectContainsWords\" SubjectContainsWords '}'*\n| parse Events  with * \"BodyContainsWords\" BodyContainsWords '}'*\n| parse Events  with * \"SubjectOrBodyContainsWords\" SubjectOrBodyContainsWords '}'*\n| where SubjectContainsWords has_any (Keywords)\n or BodyContainsWords has_any (Keywords)\n or SubjectOrBodyContainsWords has_any (Keywords)\n| extend ClientIPAddress = case( ClientIP has \".\", tostring(split(ClientIP,\":\")[0]), ClientIP has \"[\", tostring(trim_start(@'[[]',tostring(split(ClientIP,\"]\")[0]))), ClientIP )\n| extend Keyword = iff(isnotempty(SubjectContainsWords), SubjectContainsWords, (iff(isnotempty(BodyContainsWords),BodyContainsWords,SubjectOrBodyContainsWords )))\n| extend RuleDetail = case(OfficeObjectId contains '/' , tostring(split(OfficeObjectId, '/')[-1]) , tostring(split(OfficeObjectId, '\\\\')[-1]))\n| summarize count(), StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated) by  Operation, UserId, ClientIPAddress, ResultStatus, Keyword, OriginatingServer, OfficeObjectId, RuleDetail\n| extend timestamp = StartTimeUtc,  IPCustomEntity = ClientIPAddress, AccountCustomEntity = UserId , HostCustomEntity =  OriginatingServer",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "DefenseEvasion"
+                ],
+                "alertRuleTemplateName": "7b907bf7-77d4-41d0-a208-5643ff75bf9a",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

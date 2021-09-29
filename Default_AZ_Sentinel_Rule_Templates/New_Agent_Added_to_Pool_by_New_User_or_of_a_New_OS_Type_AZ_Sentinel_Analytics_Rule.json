@@ -1,0 +1,72 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/b3f5d220-3967-4ea6-af7c-2cb4ab78d0be')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/b3f5d220-3967-4ea6-af7c-2cb4ab78d0be')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "New Agent Added to Pool by New User or of a New OS Type.",
+                "description": "As seen in attacks such as SolarWinds attackers can look to subvert a build process by controlling build servers. Azure DevOps uses agent pools to execute pipeline tasks. An attacker could insert compromised agents that they control into the pools in order to execute malicious code. This query looks for users adding agents to pools they have not added agents to before, or adding agents to a pool of an OS that has not been added to that pool before. This detection has potential for false positives so has a configurable allow list to allow for certain users to be excluded from the logic.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let lookback = 14d;\nlet timeframe = 1d;\n// exclude allowed users from query such as the ADO service\nlet allowed_users = dynamic([\"Azure DevOps Service\"]);\nunion\n// Look for agents being added to a pool of a OS type not seen with that pool before\n(AzureDevOpsAuditing\n| where TimeGenerated > ago(lookback) and TimeGenerated < ago(timeframe)\n| where OperationName =~ \"Library.AgentAdded\"\n| where ActorUPN !in (allowed_users)\n| extend AgentPoolName = tostring(Data.AgentPoolName)\n| extend OsDescription = tostring(Data.OsDescription)\n| where isnotempty(OsDescription)\n| extend OsDescription = tostring(split(OsDescription, \"#\", 0)[0])\n| project AgentPoolName, OsDescription\n| join kind=rightanti (AzureDevOpsAuditing\n| where TimeGenerated > ago(timeframe)\n| where OperationName == \"Library.AgentAdded\"\n| extend AgentPoolName = tostring(Data.AgentPoolName)\n| extend OsDescription = tostring(Data.OsDescription)\n| where isnotempty(OsDescription)\n| extend OsDescription = tostring(split(OsDescription, \"#\", 0)[0])) on AgentPoolName, OsDescription),\n// Look for users addeing agents to a pool that they have not added agents to before.\n(AzureDevOpsAuditing\n| where TimeGenerated > ago(lookback) and TimeGenerated < ago(timeframe)\n| extend AgentPoolName = tostring(Data.AgentPoolName)\n| where ActorUPN !in (allowed_users)\n| project AgentPoolName, ActorUPN\n| join kind=rightanti (AzureDevOpsAuditing\n| where TimeGenerated > ago(timeframe)\n| where OperationName == \"Library.AgentAdded\"\n| where ActorUPN !in (allowed_users)\n| extend AgentPoolName = tostring(Data.AgentPoolName)\n) on AgentPoolName, ActorUPN)\n| extend AgentName = tostring(Data.AgentName)\n| extend OsDescription = tostring(Data.OsDescription)\n| extend SystemDetails = Data.SystemCapabilities\n| project-reorder TimeGenerated, OperationName, ScopeDisplayName, AgentPoolName, AgentName, ActorUPN, IpAddress, UserAgent, OsDescription, SystemDetails, Data\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Execution"
+                ],
+                "alertRuleTemplateName": "4ce177b3-56b1-4f0e-b83e-27eed4cb0b16",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

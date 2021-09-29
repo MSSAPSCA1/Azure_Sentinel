@@ -1,0 +1,72 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/81781c82-6d9c-4e1c-89e2-8fe468b8c752')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/81781c82-6d9c-4e1c-89e2-8fe468b8c752')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Security Service Registry ACL Modification",
+                "description": "Identifies attempts to modify registry ACL to evade security solutions. In the Solorigate attack, the attackers were found modifying registry permissions so services.exe cannot access the relevant registry keys to start the service.\n The detection leverages Security Event as well as MDE data to identify when specific security services registry permissions are modified. \n Only some portions of this detection are related to Solorigate, it also includes coverage for some common tools that perform this activity. \n Reference on guidance for enabling registry auditing:\n - https://docs.microsoft.com/windows/security/threat-protection/auditing/advanced-security-auditing-faq\n - https://docs.microsoft.com/windows/security/threat-protection/auditing/appendix-a-security-monitoring-recommendations-for-many-audit-events\n - https://docs.microsoft.com/windows/security/threat-protection/auditing/audit-registry\n - https://docs.microsoft.com/windows/security/threat-protection/auditing/event-4670\n   - For the event 4670 to be created the audit policy for the registry must have auditing enabled for Write DAC and/or Write Owner\n - https://github.com/OTRF/Set-AuditRule \n - https://docs.microsoft.com/dotnet/api/system.security.accesscontrol.registryrights?view=dotnet-plat-ext-5.0",
+                "severity": "High",
+                "enabled": true,
+                "query": "let servicelist = dynamic(['Services\\\\HealthService', 'Services\\\\Sense', 'Services\\\\WinDefend', 'Services\\\\MsSecFlt', 'Services\\\\DiagTrack', 'Services\\\\SgrmBroker', 'Services\\\\SgrmAgent', 'Services\\\\AATPSensorUpdater' , 'Services\\\\AATPSensor', 'Services\\\\mpssvc']);\nlet filename = dynamic([\"subinacl.exe\",'SetACL.exe']);\nlet parameters = dynamic (['/deny=SYSTEM', '/deny=S-1-5-18', '/grant=SYSTEM=r', '/grant=S-1-5-18=r', 'n:SYSTEM;p:READ', 'n1:SYSTEM;ta:remtrst;w:dacl']);\nlet FullAccess = dynamic(['A;CI;KA;;;SY', 'A;ID;KA;;;SY', 'A;CIID;KA;;;SY']);\nlet ReadAccess = dynamic(['A;CI;KR;;;SY', 'A;ID;KR;;;SY', 'A;CIID;KR;;;SY']);\nlet DenyAccess = dynamic(['D;CI;KR;;;SY', 'D;ID;KR;;;SY', 'D;CIID;KR;;;SY']);\nlet timeframe = 1d;\n(union isfuzzy=true\n(\nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n| where EventID == 4670\n| where ObjectType == 'Key'\n| where ObjectName has_any (servicelist)\n| parse EventData with * 'OldSd\">' OldSd \"<\" *\n| parse EventData with * 'NewSd\">' NewSd \"<\" *\n| extend Reason = case( (OldSd has ';;;SY' and NewSd !has ';;;SY'), 'System Account is removed', (OldSd has_any (FullAccess) and NewSd has_any (ReadAccess)) , 'System permission has been changed to read from full access', (OldSd has_any (FullAccess) and NewSd has_any (DenyAccess)), 'System account has been given denied permission', 'None')\n| project TimeGenerated, Computer, Account,  ProcessName, ProcessId, ObjectName, EventData, Activity, HandleId, SubjectLogonId, OldSd, NewSd , Reason\n),\n(\nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n| where EventID == 4688\n| extend ProcessName = tostring(split(NewProcessName, '\\\\')[-1])\n| where ProcessName in~ (filename) \n| where CommandLine has_any (servicelist) and CommandLine has_any (parameters)\n| project TimeGenerated, Computer, Account, AccountDomain, ProcessName, ProcessNameFullPath = NewProcessName, EventID, Activity, CommandLine, EventSourceName, Type\n),\n(\nDeviceProcessEvents\n| where TimeGenerated >= ago(timeframe)\n| where InitiatingProcessFileName in~ (filename) \n| where InitiatingProcessCommandLine has_any(servicelist) and InitiatingProcessCommandLine has_any (parameters)\n| extend Account = iff(isnotempty(InitiatingProcessAccountUpn), InitiatingProcessAccountUpn, InitiatingProcessAccountName), Computer = DeviceName\n| project TimeGenerated, Computer, Account, AccountDomain, ProcessName = InitiatingProcessFileName, ProcessNameFullPath = FolderPath, Activity = ActionType, CommandLine = InitiatingProcessCommandLine, Type, InitiatingProcessParentFileName\n)\n)\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "DefenseEvasion"
+                ],
+                "alertRuleTemplateName": "473d57e6-f787-435c-a16b-b38b51fa9a4b",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

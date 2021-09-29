@@ -1,0 +1,77 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/77ca2edd-f363-48bd-9b46-0b4830cfc004')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/77ca2edd-f363-48bd-9b46-0b4830cfc004')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Linked Malicious Storage Artifacts",
+                "description": "An IP address which uploaded malicious content to an Azure Blob or File Storage container (triggering a malware alert) also uploaded additional files.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "//Collect the alert events\nlet alertData = SecurityAlert \n| where DisplayName has \"Potential malware uploaded to\" \n| extend Entities = parse_json(Entities) \n| mv-expand Entities;\n//Parse the IP address data\nlet ipData = alertData \n| where Entities['Type'] =~ \"ip\" \n| extend AttackerIP = tostring(Entities['Address']), AttackerCountry = tostring(Entities['Location']['CountryName']);\n//Parse the file data\nlet FileData = alertData \n| where Entities['Type'] =~ \"file\" \n| extend MaliciousFileDirectory = tostring(Entities['Directory']), MaliciousFileName = tostring(Entities['Name']), MaliciousFileHashes = tostring(Entities['FileHashes']);\n//Combine the File and IP data together\nipData \n| join (FileData) on VendorOriginalId \n| summarize by TimeGenerated, AttackerIP, AttackerCountry, DisplayName, ResourceId, AlertType, MaliciousFileDirectory, MaliciousFileName, MaliciousFileHashes\n//Create a type column so we can track if it was a File storage or blobl storage upload \n| extend type = iff(DisplayName has \"file\", \"File\", \"Blob\") \n| join (\n  union\n  StorageFileLogs, \n  StorageBlobLogs \n  //File upload operations \n  | where OperationName =~ \"PutBlob\" or OperationName =~ \"PutRange\"\n  //Parse out the uploader IP \n  | extend ClientIP = tostring(split(CallerIpAddress, \":\", 0)[0])\n  //Extract the filename from the Uri \n  | extend FileName = extract(@\"\\/([\\w\\-. ]+)\\?\", 1, Uri)\n  //Base64 decode the MD5 filehash, we will encounter non-ascii hex so string operations don't work\n  //We can work around this by making it an array then converting it to hex from an int \n  | extend base64Char = base64_decode_toarray(ResponseMd5) \n  | mv-expand base64Char \n  | extend hexChar = tohex(toint(base64Char))\n  | extend hexChar = iff(strlen(hexChar) < 2, strcat(\"0\", hexChar), hexChar) \n  | extend SourceTable = iff(OperationName has \"range\", \"StorageFileLogs\", \"StorageBlobLogs\") \n  | summarize make_list(hexChar) by CorrelationId, ResponseMd5, FileName, AccountName, TimeGenerated, RequestBodySize, ClientIP, SourceTable \n  | extend Md5Hash = strcat_array(list_hexChar, \"\")\n  //Pack the file information the summarise into a ClientIP row \n  | extend p = pack(\"FileName\", FileName, \"FileSize\", RequestBodySize, \"Md5Hash\", Md5Hash, \"Time\", TimeGenerated, \"SourceTable\", SourceTable) \n  | summarize UploadedFileInfo=make_list(p), FilesUploaded=count() by ClientIP \n      | join kind=leftouter (\n        union\n        StorageFileLogs,\n        StorageBlobLogs               \n        | where OperationName =~ \"DeleteFile\" or OperationName =~ \"DeleteBlob\"         \n        | extend ClientIP = tostring(split(CallerIpAddress, \":\", 0)[0])         \n        | extend FileName = extract(@\"\\/([\\w\\-. ]+)\\?\", 1, Uri)         \n        | extend SourceTable = iff(OperationName has \"range\", \"StorageFileLogs\", \"StorageBlobLogs\")         \n        | extend p = pack(\"FileName\", FileName, \"Time\", TimeGenerated, \"SourceTable\", SourceTable)         \n        | summarize DeletedFileInfo=make_list(p), FilesDeleted=count() by ClientIP\n        ) on ClientIP\n  ) on $left.AttackerIP == $right.ClientIP \n| mvexpand UploadedFileInfo \n| extend LinkedMaliciousFileName = UploadedFileInfo.FileName \n| extend LinkedMaliciousFileHash = UploadedFileInfo.Md5Hash     \n| project AlertTimeGenerated = TimeGenerated, tostring(LinkedMaliciousFileName), tostring(LinkedMaliciousFileHash), AlertType, AttackerIP, AttackerCountry, MaliciousFileDirectory, MaliciousFileName, FilesUploaded, UploadedFileInfo \n| extend FileHashCustomEntity = LinkedMaliciousFileName, HashAlgorithm = \"MD5\", IPCustomEntity = AttackerIP",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CommandAndControl",
+                    "Exfiltration"
+                ],
+                "alertRuleTemplateName": "b9e3b9f8-a406-4151-9891-e5ff1ddd8c1d",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "FileHash",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Algorithm",
+                                "columnName": "HashAlgorithm"
+                            },
+                            {
+                                "identifier": "Value",
+                                "columnName": "FileHashCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

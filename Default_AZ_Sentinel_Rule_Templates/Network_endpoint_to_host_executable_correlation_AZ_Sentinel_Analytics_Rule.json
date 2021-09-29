@@ -1,0 +1,90 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/7da74b5a-47f5-48c6-a31d-6ce4c031e84e')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/7da74b5a-47f5-48c6-a31d-6ce4c031e84e')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Network endpoint to host executable correlation",
+                "description": "Correlates blocked URLs hosting [malicious] executables with host endpoint data\nto identify potential instances of executables of the same name having been recently run.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let endpointData = \n(SecurityEvent\n  | where EventID == 4688\n  | extend shortFileName = tostring(split(NewProcessName, '\\\\')[-1])\n  );\n// Correlate suspect executables seen in TrendMicro rule updates with similar activity on endpoints\nCommonSecurityLog\n| where DeviceVendor =~ \"Trend Micro\"\n| where Activity =~ \"Deny List updated\" \n| where RequestURL endswith \".exe\"\n| project TimeGenerated, Activity , RequestURL , SourceIP, DestinationIP\n| extend suspectExeName = tolower(tostring(split(RequestURL, '/')[-1]))\n| join (endpointData) on $left.suspectExeName == $right.shortFileName \n| extend timestamp = TimeGenerated, IPCustomEntity = DestinationIP, AccountCustomEntity = TargetUserName, HostCustomEntity = Computer, URLCustomEntity = RequestURL",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Execution"
+                ],
+                "alertRuleTemplateName": "01f64465-b1ef-41ea-a7f5-31553a11ad43",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "URL",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Url",
+                                "columnName": "URLCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

@@ -1,0 +1,151 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/30467c3f-d927-4821-8b1f-7dcfe8ea97ea')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/30467c3f-d927-4821-8b1f-7dcfe8ea97ea')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Palo Alto - possible internal to external port scanning",
+                "description": "Identifies a list of internal Source IPs (10.x.x.x Hosts) that have triggered 10 or more non-graceful tcp server resets from one or more Destination IPs which \nresults in an \"ApplicationProtocol = incomplete\" designation. The server resets coupled with an \"Incomplete\" ApplicationProtocol designation can be an indication \nof internal to external port scanning or probing attack. \nReferences: https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClUvCAK and\nhttps://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClTaCAK",
+                "severity": "Low",
+                "enabled": true,
+                "query": "CommonSecurityLog \n| where isnotempty(DestinationPort) and DeviceAction !in (\"reset-both\", \"deny\") \n// filter out common usage ports. Add ports that are legitimate for your environment\n| where DestinationPort !in (\"443\", \"53\", \"389\", \"80\", \"0\", \"880\", \"8888\", \"8080\")\n| where ApplicationProtocol == \"incomplete\" \n// filter out IANA ephemeral or negotiated ports as per https://en.wikipedia.org/wiki/Ephemeral_port\n| where DestinationPort !between (toint(49512) .. toint(65535)) \n| where Computer != \"\" \n| where DestinationIP !startswith \"10.\"\n// Filter out any graceful reset reasons of AGED OUT which occurs when a TCP session closes with a FIN due to aging out. \n| where AdditionalExtensions !has \"reason=aged-out\" \n// Filter out any TCP FIN which occurs when a TCP FIN is used to gracefully close half or both sides of a connection.\n| where AdditionalExtensions !has \"reason=tcp-fin\" \n// Uncomment one of the following where clauses to trigger on specific TCP reset reasons\n// See Palo Alto article for details - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClUvCAK\n// TCP RST-server - Occurs when the server sends a TCP reset to the client\n// | where AdditionalExtensions has \"reason=tcp-rst-from-server\"  \n// TCP RST-client - Occurs when the client sends a TCP reset to the server\n// | where AdditionalExtensions has \"reason=tcp-rst-from-client\"  \n| extend reason = tostring(split(AdditionalExtensions, \";\")[3])\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), count() by DeviceName, SourceUserID, SourceIP, ApplicationProtocol, reason, DestinationPort, Protocol, DeviceVendor, DeviceProduct, DeviceAction, DestinationIP\n| where count_ >= 10\n| summarize StartTimeUtc = min(StartTimeUtc), EndTimeUtc = max(EndTimeUtc), makeset(DestinationIP), totalcount = sum(count_) by DeviceName, SourceUserID, SourceIP, ApplicationProtocol, reason, DestinationPort, Protocol, DeviceVendor, DeviceProduct, DeviceAction\n| extend timestamp = StartTimeUtc, IPCustomEntity = SourceIP, AccountCustomEntity = SourceUserID, HostCustomEntity = DeviceName",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Discovery"
+                ],
+                "alertRuleTemplateName": "5b72f527-e3f6-4a00-9908-8e4fee14da9f",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/1b1ed1b7-6003-4904-b841-bfb3fac818c6')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/1b1ed1b7-6003-4904-b841-bfb3fac818c6')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Palo Alto - potential beaconing detected",
+                "description": "Identifies beaconing patterns from Palo Alto Network traffic logs based on recurrent timedelta patterns. \nThe query leverages various KQL functions to calculate time deltas and then compares it with total events observed in a day to find percentage of beaconing. \nThis outbound beaconing pattern to untrusted public networks should be investigated for any malware callbacks or data exfiltration attempts.\nReference Blog:\nhttp://www.austintaylor.io/detect/beaconing/intrusion/detection/system/command/control/flare/elastic/stack/2017/06/10/detect-beaconing-with-flare-elasticsearch-and-intrusion-detection-systems/",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let starttime = 2d;\nlet endtime = 1d;\nlet TimeDeltaThreshold = 10;\nlet TotalEventsThreshold = 15;\nlet PercentBeaconThreshold = 80;\nlet PrivateIPregex = @'^127\\.|^10\\.|^172\\.1[6-9]\\.|^172\\.2[0-9]\\.|^172\\.3[0-1]\\.|^192\\.168\\.';\nCommonSecurityLog\n| where DeviceVendor == \"Palo Alto Networks\" and Activity == \"TRAFFIC\"\n| where TimeGenerated between (ago(starttime)..ago(endtime))\n| extend DestinationIPType = iff(DestinationIP matches regex PrivateIPregex,\"private\" ,\"public\" )\n| where DestinationIPType == \"public\"\n| project TimeGenerated, DeviceName, SourceUserID, SourceIP, SourcePort, DestinationIP, DestinationPort, ReceivedBytes, SentBytes\n| sort by SourceIP asc,TimeGenerated asc, DestinationIP asc, DestinationPort asc\n| serialize\n| extend nextTimeGenerated = next(TimeGenerated, 1), nextSourceIP = next(SourceIP, 1)\n| extend TimeDeltainSeconds = datetime_diff('second',nextTimeGenerated,TimeGenerated)\n| where SourceIP == nextSourceIP\n//Whitelisting criteria/ threshold criteria\n| where TimeDeltainSeconds > TimeDeltaThreshold \n| project TimeGenerated, TimeDeltainSeconds, DeviceName, SourceUserID, SourceIP, SourcePort, DestinationIP, DestinationPort, ReceivedBytes, SentBytes\n| summarize count(), sum(ReceivedBytes), sum(SentBytes), make_list(TimeDeltainSeconds) \nby TimeDeltainSeconds, bin(TimeGenerated, 1h), DeviceName, SourceUserID, SourceIP, DestinationIP, DestinationPort\n| summarize (MostFrequentTimeDeltaCount, MostFrequentTimeDeltainSeconds) = arg_max(count_, TimeDeltainSeconds), TotalEvents=sum(count_), TotalSentBytes = sum(sum_SentBytes), TotalReceivedBytes = sum(sum_ReceivedBytes) \nby bin(TimeGenerated, 1h), DeviceName, SourceUserID, SourceIP, DestinationIP, DestinationPort\n| where TotalEvents > TotalEventsThreshold \n| extend BeaconPercent = MostFrequentTimeDeltaCount/toreal(TotalEvents) * 100\n| where BeaconPercent > PercentBeaconThreshold\n| extend timestamp = TimeGenerated, IPCustomEntity = DestinationIP, AccountCustomEntity = SourceUserID, HostCustomEntity = DeviceName",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CommandAndControl"
+                ],
+                "alertRuleTemplateName": "f0be259a-34ac-4946-aa15-ca2b115d5feb",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

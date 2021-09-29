@@ -1,0 +1,72 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/a02e1c61-4acd-439c-a201-ccc38ff470d0')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/a02e1c61-4acd-439c-a201-ccc38ff470d0')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Sensitive Azure Key Vault operations",
+                "description": "Identifies when sensitive Azure Key Vault operations are used. This includes: VaultDelete, KeyDelete, SecretDelete, SecretPurge, KeyPurge, SecretBackup, KeyBackup. \nAny Backup operations should match with expected scheduled backup activity.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let SensitiveOperationList = dynamic(\n[\"VaultDelete\", \"KeyDelete\", \"SecretDelete\", \"SecretPurge\", \"KeyPurge\", \"SecretBackup\", \"KeyBackup\"]);\nAzureDiagnostics\n| extend ResultType = columnifexists(\"ResultType\", \"NoResultType\")\n| extend requestUri_s = columnifexists(\"requestUri_s\", \"None\"), identity_claim_http_schemas_microsoft_com_identity_claims_objectidentifier_g = columnifexists(\"identity_claim_http_schemas_microsoft_com_identity_claims_objectidentifier_g\", \"None\")\n| extend id_s = columnifexists(\"id_s\", \"None\"), CallerIPAddress = columnifexists(\"CallerIPAddress\", \"None\"), clientInfo_s = columnifexists(\"clientInfo_s\", \"None\")\n| where ResultType !~ \"None\" and isnotempty(ResultType)\n| where identity_claim_http_schemas_microsoft_com_identity_claims_objectidentifier_g !~ \"None\" and isnotempty(identity_claim_http_schemas_microsoft_com_identity_claims_objectidentifier_g)\n| where id_s !~ \"None\" and isnotempty(id_s)\n| where CallerIPAddress !~ \"None\" and isnotempty(CallerIPAddress)\n| where clientInfo_s !~ \"None\" and isnotempty(clientInfo_s)\n| where requestUri_s !~ \"None\" and isnotempty(requestUri_s)\n| where ResourceType =~ \"VAULTS\" and ResultType =~ \"Success\" \n| where OperationName in~ (SensitiveOperationList)  \n| summarize EventCount=count(), StartTimeUtc=min(TimeGenerated), EndTimeUtc=max(TimeGenerated), TimeTriggered=makelist(TimeGenerated),OperationNameList=make_set(OperationName), RequestURLList=make_set(requestUri_s), CallerIPList = make_set(CallerIPAddress),  CallerIPMax= arg_max(CallerIPAddress,*) by ResourceType, ResultType, Resource, id_s, identity_claim_http_schemas_microsoft_com_identity_claims_objectidentifier_g, clientInfo_s\n| extend timestamp = StartTimeUtc, IPCustomEntity = CallerIPMax, AccountCustomEntity = identity_claim_http_schemas_microsoft_com_identity_claims_objectidentifier_g",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Impact"
+                ],
+                "alertRuleTemplateName": "d6491be0-ab2d-439d-95d6-ad8ea39277c5",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

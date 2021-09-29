@@ -1,0 +1,77 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/57fd3b84-4bbe-4a7d-a4d9-5c367bb4ef90')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/57fd3b84-4bbe-4a7d-a4d9-5c367bb4ef90')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "New user created and added to the built-in administrators group",
+                "description": "Identifies when a user account was created and then added to the builtin Administrators group in the same day.\nThis should be monitored closely and all additions reviewed.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "SecurityEvent\n| where EventID == 4720\n| where AccountType == \"User\"\n| project CreatedUserTime = TimeGenerated, CreatedUserEventID = EventID, CreatedUserActivity = Activity, Computer = toupper(Computer), \nCreatedUser = tolower(TargetAccount), CreatedUserSid = TargetSid, AccountUsedToCreateUser = strcat(SubjectAccount), SidofAccountUsedToCreateUser = SubjectUserSid\n| join (\nSecurityEvent \n| where AccountType == \"User\"\n// 4732 - A member was added to a security-enabled local group\n| where EventID == 4732\n//TargetSid is the builin Admins group: S-1-5-32-544\n| where TargetSid == \"S-1-5-32-544\"\n| project GroupAddTime = TimeGenerated, GroupAddEventID = EventID, GroupAddActivity = Activity, Computer = toupper(Computer), GroupName = tolower(TargetAccount), \nGroupSid = TargetSid, AccountThatAddedUser = SubjectAccount, SIDofAccountThatAddedUser = SubjectUserSid, CreatedUserSid = MemberSid\n)\non CreatedUserSid\n//Create User first, then the add to the group.\n| project Computer, CreatedUserTime, CreatedUserEventID, CreatedUserActivity, CreatedUser, CreatedUserSid, GroupAddTime, GroupAddEventID, \nGroupAddActivity, AccountUsedToCreateUser, GroupName, GroupSid, AccountThatAddedUser, SIDofAccountThatAddedUser \n| extend timestamp = CreatedUserTime, AccountCustomEntity = CreatedUser, HostCustomEntity = Computer",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence",
+                    "PrivilegeEscalation"
+                ],
+                "alertRuleTemplateName": "aa1eff90-29d4-49dc-a3ea-b65199f516db",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            },
+                            {
+                                "identifier": "Sid",
+                                "columnName": "CreatedUserSid"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

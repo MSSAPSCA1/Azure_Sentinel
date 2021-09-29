@@ -1,0 +1,115 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/4a8f6e27-1a6d-4177-b064-3fcea7d13420')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/4a8f6e27-1a6d-4177-b064-3fcea7d13420')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "SUNSPOT log file creation",
+                "description": "This query uses Microsoft Defender for Endpoint data and Windows Event Logs to look for IoCs associated with the SUNSPOT malware shared by Crowdstrike.\nMore details: \n  - https://www.crowdstrike.com/blog/sunspot-malware-technical-analysis/ \n  - https://techcommunity.microsoft.com/t5/azure-sentinel/monitoring-your-software-build-process-with-azure-sentinel/ba-p/2140807",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "union isfuzzy=true\n(DeviceFileEvents\n| where FolderPath endswith \"vmware-vmdmp.log\"\n| extend HostCustomEntity = DeviceName, timestamp=TimeGenerated),\n(SecurityEvent\n| where EventID == 4663\n| where ObjectName endswith \"vmware-vmdmp.log\"\n| extend HostCustomEntity = Computer, timestamp=TimeGenerated),\n(imFileEvent\n| where TargetFileName endswith \"vmware-vmdmp.log\"\n| extend HostCustomEntity = DvcHostname, timestamp=TimeGenerated\n)",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "c0e84221-f240-4dd7-ab1e-37e034ea2a4e",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/1bb671b8-3126-440a-9729-60bc9f2357a3')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/1bb671b8-3126-440a-9729-60bc9f2357a3')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "SUNSPOT malware hashes",
+                "description": "This query uses Microsoft Defender for Endpoint data to look for IoCs associated with the SUNSPOT malware shared by Crowdstrike.\nMore details: \n  - https://www.crowdstrike.com/blog/sunspot-malware-technical-analysis/ \n  - https://techcommunity.microsoft.com/t5/azure-sentinel/monitoring-your-software-build-process-with-azure-sentinel/ba-p/2140807",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let SUNSPOT_Hashes = dynamic([\"c45c9bda8db1d470f1fd0dcc346dc449839eb5ce9a948c70369230af0b3ef168\", \"0819db19be479122c1d48743e644070a8dc9a1c852df9a8c0dc2343e904da389\"]);\nunion isfuzzy=true(\nDeviceEvents\n| where InitiatingProcessSHA256 in (SUNSPOT_Hashes)),\n(DeviceImageLoadEvents\n| where InitiatingProcessSHA256 in (SUNSPOT_Hashes))\n| extend HostCustomEntity = DeviceName, timestamp=TimeGenerated",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "53e936c6-6c30-4d12-8343-b8a0456e8429",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

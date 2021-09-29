@@ -1,0 +1,134 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/badc3b20-e9c0-43d5-afaf-b8ea47309f63')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/badc3b20-e9c0-43d5-afaf-b8ea47309f63')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Mail redirect via ExO transport rule",
+                "description": "Identifies when Exchange Online transport rule configured to forward emails.\nThis could be an adversary mailbox configured to collect mail from multiple user accounts.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "OfficeActivity\n| where OfficeWorkload == \"Exchange\"\n| where Operation in~ (\"New-TransportRule\", \"Set-TransportRule\")\n| extend p = parse_json(Parameters)\n| extend RuleName = case(\n  Operation =~ \"Set-TransportRule\", tostring(OfficeObjectId),\n  Operation =~ \"New-TransportRule\", tostring(p[1].Value),\n  \"Unknown\"\n  ) \n| mvexpand p\n| where (p.Name =~ \"BlindCopyTo\" or p.Name =~ \"RedirectMessageTo\") and isnotempty(p.Value)\n| extend RedirectTo = p.Value\n| extend ClientIPOnly = case( \n  ClientIP has \".\" and ClientIP has \":\", tostring(split(ClientIP,\":\")[0]), \n  ClientIP has \".\" and ClientIP has \"-\", tostring(split(ClientIP,\"-\")[0]), \n  ClientIP has \"[\", tostring(trim_start(@'[[]',tostring(split(ClientIP,\"]\")[0]))),\n  ClientIP\n  )  \n| extend Port = case(\n  ClientIP has \".\" and ClientIP has \":\", (split(ClientIP,\":\")[1]),\n  ClientIP has \".\" and ClientIP has \"-\", (split(ClientIP,\"-\")[1]),\n  ClientIP has \"[\" and ClientIP has \":\", tostring(split(ClientIP,\"]:\")[1]),\n  ClientIP has \"[\" and ClientIP has \"-\", tostring(split(ClientIP,\"]-\")[1]),\n  ClientIP\n  )\n| extend ClientIP = ClientIPOnly\n| project TimeGenerated, RedirectTo, ClientIP, Port, UserId, Operation, RuleName\n| extend timestamp = TimeGenerated, AccountCustomEntity = UserId, IPCustomEntity = ClientIP",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Collection",
+                    "Exfiltration"
+                ],
+                "alertRuleTemplateName": "500415fb-bba7-4227-a08a-9857fb61b6a7",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/9aea6a23-49f3-470b-bd26-5c3c11b7308f')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/9aea6a23-49f3-470b-bd26-5c3c11b7308f')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Mail.Read Permissions Granted to Application",
+                "description": "This query look for applications that have been granted (Delegated or App/Role) permissions to Read Mail (Permissions field has Mail.Read) and subsequently has been consented to. This can help identify applications that have been abused to gain access to mailboxes.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "AuditLogs\n| where Category =~ \"ApplicationManagement\"\n| where ActivityDisplayName has_any (\"Add delegated permission grant\",\"Add app role assignment to service principal\")\n| where Result =~ \"success\"\n| where tostring(InitiatedBy.user.userPrincipalName) has \"@\" or tostring(InitiatedBy.app.displayName) has \"@\"\n| extend props = parse_json(tostring(TargetResources[0].modifiedProperties))\n| mv-expand props\n| extend UserAgent = tostring(AdditionalDetails[0].value)\n| extend InitiatingUser = tostring(parse_json(tostring(InitiatedBy.user)).userPrincipalName)\n| extend UserIPAddress = tostring(parse_json(tostring(InitiatedBy.user)).ipAddress)\n| extend DisplayName = tostring(props.displayName)\n| extend Permissions = tostring(parse_json(tostring(props.newValue)))\n| where Permissions has_any (\"Mail.Read\", \"Mail.ReadWrite\")\n| extend PermissionsAddedTo = tostring(TargetResources[0].displayName)\n| extend Type = tostring(TargetResources[0].type)\n| project-away props\n| join kind=leftouter(\n  AuditLogs\n  | where ActivityDisplayName has \"Consent to application\"\n  | extend AppName = tostring(TargetResources[0].displayName)\n  | extend AppId = tostring(TargetResources[0].id)\n  | project AppName, AppId, CorrelationId) on CorrelationId\n| project-reorder TimeGenerated, OperationName, InitiatingUser, UserIPAddress, UserAgent, PermissionsAddedTo, Permissions, AppName, AppId, CorrelationId\n| extend timestamp = TimeGenerated, AccountCustomEntity = InitiatingUser, IPCustomEntity = UserIPAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "2560515c-07d1-434e-87fb-ebe3af267760",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

@@ -1,0 +1,82 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8deb32c1-ea71-4706-9096-03da6b69170b')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8deb32c1-ea71-4706-9096-03da6b69170b')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "THALLIUM domains included in DCU takedown",
+                "description": "THALLIUM spearphishing and command and control domains included in December 2019 DCU/MSTIC takedown. \n Matches domain name IOCs related to the THALLIUM activity group with CommonSecurityLog, DnsEvents, VMConnection and SecurityEvents dataTypes.\n References: https://blogs.microsoft.com/on-the-issues/2019/12/30/microsoft-court-action-against-nation-state-cybercrime/ ",
+                "severity": "High",
+                "enabled": true,
+                "query": "let DomainNames = dynamic([\"seoulhobi.biz\", \"reader.cash\", \"pieceview.club\", \"app-wallet.com\", \"bigwnet.com\", \"bitwoll.com\", \"cexrout.com\", \"change-pw.com\", \"checkprofie.com\", \"cloudwebappservice.com\", \"ctquast.com\", \"dataviewering.com\", \"day-post.com\", \"dialy-post.com\", \"documentviewingcom.com\", \"dovvn-mail.com\", \"down-error.com\", \"drivecheckingcom.com\", \"drog-service.com\", \"encodingmail.com\", \"filinvestment.com\", \"foldershareing.com\", \"golangapis.com\", \"hotrnall.com\", \"lh-logins.com\", \"login-use.com\", \"mail-down.com\", \"matmiho.com\", \"mihomat.com\", \"natwpersonal-online.com\", \"nidlogin.com\", \"nid-login.com\", \"nidlogon.com\", \"pw-change.com\", \"rnaii.com\", \"rnailm.com\", \"sec-live.com\", \"secrityprocessing.com\", \"securitedmode.com\", \"securytingmail.com\", \"set-login.com\", \"usrchecking.com\", \"com-serviceround.info\", \"mai1.info\", \"reviewer.mobi\", \"files-download.net\", \"fixcool.net\", \"hanrnaii.net\", \"office356-us.org\", \"smtper.org\"]);\n(union isfuzzy=true\n(CommonSecurityLog \n| parse Message with * '(' DNSName ')' * \n| where isnotempty(FileHash)\n| where DNSName in~ (DomainNames)\n| extend Account = SourceUserID, Computer = DeviceName, IPAddress = SourceIP\n),\n(DnsEvents \n| extend DNSName = Name\n| where isnotempty(DNSName)\n| where DNSName has_any (DomainNames)\n| extend IPAddress = ClientIP\n),\n(imDns \n| where isnotempty(DnsQuery)\n| where DnsQuery has_any (DomainNames)\n| extend DNSName = DnsQuery\n| extend IPAddress = SrcIpAddr\n),\n(VMConnection \n| parse RemoteDnsCanonicalNames with * '[\"' DNSName '\"]' *\n| where isnotempty(DNSName)\n| where DNSName  in~ (DomainNames)\n| extend IPAddress = RemoteIp\n),\n(AzureDiagnostics\n| where ResourceType == \"AZUREFIREWALLS\"\n| where Category == \"AzureFirewallDnsProxy\"\n| parse msg_s with \"DNS Request: \" ClientIP \":\" ClientPort \" - \" QueryID \" \" Request_Type \" \" Request_Class \" \" Request_Name \". \" Request_Protocol \" \" Request_Size \" \" EDNSO_DO \" \" EDNS0_Buffersize \" \" Responce_Code \" \" Responce_Flags \" \" Responce_Size \" \" Response_Duration\n| where Request_Name has_any (DomainNames)  \n| extend DNSName = Request_Name\n| extend IPAddress = ClientIP \n),\n(AzureDiagnostics \n| where ResourceType == \"AZUREFIREWALLS\"\n| where Category == \"AzureFirewallApplicationRule\"\n| parse msg_s with Protocol 'request from ' SourceHost ':' SourcePort 'to ' DestinationHost ':' DestinationPort '. Action:' Action\n| where isnotempty(DestinationHost)\n| where DestinationHost has_any (DomainNames)  \n| extend DNSName = DestinationHost \n| extend IPAddress = SourceHost \n)\n)\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IPAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CommandAndControl",
+                    "CredentialAccess"
+                ],
+                "alertRuleTemplateName": "70b12a3b-4896-42cb-910c-5ffaf8d7987d",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

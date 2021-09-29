@@ -1,0 +1,72 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/0276ddd0-a024-4406-8289-3e5123f468ee')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/0276ddd0-a024-4406-8289-3e5123f468ee')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Malicious web application requests linked with Microsoft Defender for Endpoint (formerly Microsoft Defender ATP) alerts",
+                "description": "Takes Microsoft Defender for Endpoint (formerly Microsoft Defender ATP) alerts where web scripts are present in the evidence and correlates with requests made to those scripts\nin the WCSIISLog to surface new alerts for potentially malicious web request activity.\nThe lookback for alerts is set to 1h and the lookback for W3CIISLogs is set to 7d. A sample set of popular web script extensions\nhas been provided in scriptExtensions that should be tailored to your environment.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let alertTimeWindow = 1h;\nlet logTimeWindow = 7d;\n// Define script extensions that suit your web application environment - a sample are provided below\nlet scriptExtensions = dynamic([\".php\", \".jsp\", \".js\", \".aspx\", \".asmx\", \".asax\", \".cfm\", \".shtml\"]); \nlet alertData = materialize(SecurityAlert \n| where TimeGenerated > ago(alertTimeWindow) \n| where ProviderName == \"MDATP\" \n// Parse and expand the alert JSON \n| extend alertData = parse_json(Entities) \n| mvexpand alertData);\nlet fileData = alertData\n// Extract web script files from MDATP alerts - our malicious web scripts - candidate webshells\n| where alertData.Type =~ \"file\" \n| where alertData.Name has_any(scriptExtensions) \n| extend FileName = tostring(alertData.Name), Directory = tostring(alertData.Directory);\nlet hostData = alertData\n// Extract server details from alerts and map to alert id\n| where alertData.Type =~ \"host\"\n| project HostName = tostring(alertData.HostName), DnsDomain = tostring(alertData.DnsDomain), SystemAlertId\n| distinct HostName, DnsDomain, SystemAlertId;\n// Join the files on their impacted servers\nlet webshellData = fileData\n| join kind=inner (hostData) on SystemAlertId \n| project TimeGenerated, FileName, Directory, HostName, DnsDomain;\nwebshellData\n| join (  \n// Find requests that were made to this file on the impacted server in the W3CIISLog table \nW3CIISLog  \n| where TimeGenerated > ago(logTimeWindow) \n// Restrict to accesses to script extensions \n| where csUriStem has_any(scriptExtensions)\n| extend splitUriStem = split(csUriStem, \"/\")  \n| extend FileName = splitUriStem[-1], HostName = sComputerName\n// Summarize potential attacker activity\n| summarize count(), StartTime=min(TimeGenerated), EndTime=max(TimeGenerated), RequestUserAgents=make_set(csUserAgent), ReqestMethods=make_set(csMethod), RequestStatusCodes=make_set(scStatus), RequestCookies=make_set(csCookie), RequestReferers=make_set(csReferer), RequestQueryStrings=make_set(csUriQuery) by AttackerIP=cIP, SiteName=sSiteName, ShellLocation=csUriStem, tostring(FileName), HostName  \n) on FileName, HostName\n| project StartTime, EndTime, AttackerIP, RequestUserAgents, HostName, SiteName, ShellLocation, ReqestMethods, RequestStatusCodes, RequestCookies, RequestReferers, RequestQueryStrings, RequestCount = count_\n// Expose the attacker ip address as a custom entity\n| extend timestamp=StartTime, IPCustomEntity = AttackerIP, HostCustomEntity = HostName",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "P7D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "alertRuleTemplateName": "fbfbf530-506b-49a4-81ad-4030885a195c",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

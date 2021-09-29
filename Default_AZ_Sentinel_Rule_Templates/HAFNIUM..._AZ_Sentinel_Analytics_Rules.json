@@ -1,0 +1,291 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/ba4cbf0a-b509-41b0-87ec-01fccaddb6ca')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/ba4cbf0a-b509-41b0-87ec-01fccaddb6ca')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "HAFNIUM New UM Service Child Process",
+                "description": "This query looks for new processes being spawned by the Exchange UM service where that process has not previously been observed before. \nReference: https://www.microsoft.com/security/blog/2021/03/02/hafnium-targeting-exchange-servers/",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let lookback = 14d;\nlet timeframe = 1d;\nSecurityEvent\n| where TimeGenerated > ago(lookback) and TimeGenerated < ago(timeframe)\n| where EventID == 4688\n| where ParentProcessName has_any (\"umworkerprocess.exe\", \"UMService.exe\")\n| join kind=rightanti (\nSecurityEvent\n| where TimeGenerated > ago(timeframe)\n| where ParentProcessName has_any (\"umworkerprocess.exe\", \"UMService.exe\")\n| where EventID == 4688) on NewProcessName\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IpAddress",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "95a15f39-d9cc-4667-8cdd-58f3113691c9",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/b1af7b0d-eca4-4006-b0e1-9efef8bc88ac')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/b1af7b0d-eca4-4006-b0e1-9efef8bc88ac')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "HAFNIUM Suspicious Exchange Request",
+                "description": "This query looks for suspicious request patterns to Exchange servers that fit a pattern observed by HAFNIUM actors.\nThe same query can be run on HTTPProxy logs from on-premise hosted Exchange servers.\nReference: https://www.microsoft.com/security/blog/2021/03/02/hafnium-targeting-exchange-servers/",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let exchange_servers = (\nW3CIISLog\n| where TimeGenerated > ago(14d)\n| where sSiteName =~ \"Exchange Back End\"\n| summarize by Computer);\nW3CIISLog\n| where TimeGenerated > ago(1d)\n| where Computer in (exchange_servers)\n| where csUriQuery startswith \"t=\"\n| project-reorder TimeGenerated, Computer, csUriStem, csUriQuery, csUserName, csUserAgent, cIP\n| extend timestamp = TimeGenerated, AccountCustomEntity = csUserName, HostCustomEntity = Computer, IPCustomEntity = cIP",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P14D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "23005e87-2d3a-482b-b03d-edbebd1ae151",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/cf87dbe3-f35c-4e48-bceb-24f072b5f3a4')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/cf87dbe3-f35c-4e48-bceb-24f072b5f3a4')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "HAFNIUM Suspicious UM Service Error",
+                "description": "This query looks for errors that may indicate that an attacker is attempting to exploit a vulnerability in the service. \nReference: https://www.microsoft.com/security/blog/2021/03/02/hafnium-targeting-exchange-servers/",
+                "severity": "Low",
+                "enabled": true,
+                "query": "Event\n| where EventLog =~ \"Application\"\n| where Source startswith \"MSExchange\"\n| where EventLevelName =~ \"error\"\n| where (RenderedDescription startswith \"Watson report\" and RenderedDescription contains \"umworkerprocess\" and RenderedDescription contains \"TextFormattingRunProperties\") or RenderedDescription startswith \"An unhandled exception occurred in a UM worker process\" or RenderedDescription startswith \"The Microsoft Exchange Unified Messaging service\" or RenderedDescription contains \"MSExchange Unified Messaging\"\n| where RenderedDescription !contains \"System.OutOfMemoryException\"\n| extend timestamp = TimeGenerated, HostCustomEntity = Computer",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "0625fcce-6d52-491e-8c68-1d9b801d25b9",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/7f9b10e9-4411-49d3-ba84-1cbfa1679ad2')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/7f9b10e9-4411-49d3-ba84-1cbfa1679ad2')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "HAFNIUM UM Service writing suspicious file",
+                "description": "This query looks for the Exchange server UM process writing suspicious files that may be indicative of webshells.\nReference: https://www.microsoft.com/security/blog/2021/03/02/hafnium-targeting-exchange-servers/",
+                "severity": "High",
+                "enabled": true,
+                "query": "let scriptExtensions = dynamic([\".php\", \".jsp\", \".js\", \".aspx\", \".asmx\", \".asax\", \".cfm\", \".shtml\"]);\nunion isfuzzy=true\n(SecurityEvent\n| where EventID == 4663\n| where Process has_any (\"umworkerprocess.exe\", \"UMService.exe\")\n| where ObjectName has_any (scriptExtensions)\n| where AccessMask in ('0x2','0x100', '0x10', '0x4')\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IpAddress\n),\n(imFileEvent\n| where EventType == \"FileCreated\"\n| where ActingProcessName has_any (\"umworkerprocess.exe\", \"UMService.exe\")\n  and\n  TargetFileName has_any (scriptExtensions)\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUsername, HostCustomEntity = DvcHostname\n),\n(DeviceFileEvents\n| where ActionType =~ \"FileCreated\"\n| where InitiatingProcessFileName has_any (\"umworkerprocess.exe\", \"UMService.exe\")\n| where FileName has_any(scriptExtensions)\n| extend timestamp = TimeGenerated, AccountCustomEntity = InitiatingProcessAccountUpn, HostCustomEntity = DeviceName, IPCustomEntity = RequestSourceIP)",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "alertRuleTemplateName": "7d6d8a8e-b08a-4082-8dbb-d7fd2cbbc35e",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "InitiatingProcessAccountUpn"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "DeviceName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

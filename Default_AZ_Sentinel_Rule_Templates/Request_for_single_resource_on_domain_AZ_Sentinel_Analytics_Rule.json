@@ -1,0 +1,63 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/ba6ec9fc-5859-4950-b855-c60808c0e832')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/ba6ec9fc-5859-4950-b855-c60808c0e832')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Request for single resource on domain",
+                "description": "This will look for connections to a domain where only a single file is requested, this is unusual as most modern web applications require additional recources. This type of activity is often assocaited with malware beaconing or tracking URL's delivered in emails. Developed for Zscaler but applicable to any outbound web logging.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "let scriptExtensions = dynamic([\".php\", \".aspx\", \".asp\", \".cfml\"]);\n//The number of URI's seen to be suspicious, higher = less likely to be suspicious\nlet uriThreshold = 1;\nCommonSecurityLog\n// Only look at connections that were allowed through the web proxy\n| where DeviceVendor =~ \"Zscaler\" and DeviceAction =~ \"Allowed\"\n// Only look where some data was exchanged.\n| where SentBytes > 0 and ReceivedBytes > 0\n// Extract the Domain\n| extend Domain = iff(countof(DestinationHostName,'.') >= 2, strcat(split(DestinationHostName,'.')[-2], '.',split(DestinationHostName,'.')[-1]), DestinationHostName)\n| extend GetData=iff(RequestURL == \"?\", 1, 0)\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), makelist(RequestURL), makelist(DestinationIP), makelist(SourceIP), numOfConnections = count(), make_set(RequestMethod), max(GetData), max(RequestContext) by Domain\n// Determine the number of URIs that have been visited for the domain\n| extend destinationURI = arraylength(list_RequestURL)\n| where destinationURI <= uriThreshold\n| where tostring(list_RequestURL) has_any(scriptExtensions)\n//Remove matches with referer\n| where max_RequestContext == \"\"\n//Keep requests where data was trasferred either in a GET with parameters or a POST\n| where set_RequestMethod in~ (\"POST\") or max_GetData == 1\n//Defeat email click tracking, may increase FN's while decreasing FP's\n| where list_RequestURL !has \"click\" and set_RequestMethod !has \"GET\"\n| mvexpand list_RequestURL, list_DestinationIP\n| extend RequestURL = tostring(list_RequestURL), DestinationIP = tostring(list_DestinationIP), ClientIP = tostring(list_SourceIP)\n//Extend custom entitites for incidents\n| extend timestamp = StartTimeUtc, IPCustomEntity = DestinationIP\n| project-away list_RequestURL, list_DestinationIP, list_SourceIP, destinationURI, Domain, StartTimeUtc, EndTimeUtc, max_GetData, max_RequestContext",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CommandAndControl"
+                ],
+                "alertRuleTemplateName": "4d500e6d-c984-43a3-9f39-7edec8dcc04d",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "IPCustomEntity"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

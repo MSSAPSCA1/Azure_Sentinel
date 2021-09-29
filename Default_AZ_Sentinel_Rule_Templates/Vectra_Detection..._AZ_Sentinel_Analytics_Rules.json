@@ -1,0 +1,377 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/0945bcfb-8554-4239-b801-812e36bdb543')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/0945bcfb-8554-4239-b801-812e36bdb543')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Vectra Detection - Botnet Activity",
+                "description": "This query searches for Botnet Activity Detections triggered by one Detect's AI models.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "CommonSecurityLog\n| where DeviceVendor == \"Vectra Networks\"\n| where DeviceProduct == \"X Series\"\n| where DeviceEventClassID != \"campaigns\" and DeviceEventClassID != \"hsc\" and DeviceEventClassID != \"audit\" and DeviceEventClassID != \"health\" and DeviceEventClassID != \"asc\" \n| extend cat = extract(\"cat=(.+?);\", 1, AdditionalExtensions) \n| where cat == \"BOTNET ACTIVITY\" \n| project-rename threat_score = FlexNumber1\n| project-rename certainty_score = FlexNumber2\n| project-rename triaged = DeviceCustomString5\n| project-rename vectra_URL = DeviceCustomString4\n| project-rename detection_name = DeviceEventClassID\n| summarize arg_max(threat_score, *) by SourceHostName, detection_name\n| project  SourceHostName, SourceIP, DestinationIP, DestinationPort, DestinationHostName, detection_name, cat, threat_score, certainty_score, triaged, vectra_URL",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Impact"
+                ],
+                "alertRuleTemplateName": "3fffc448-7010-4215-bf94-c2fd05dd1810",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "SourceHostName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "SourceIP"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/5c5168f3-df83-4961-8c3b-26fa39a8f6a5')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/5c5168f3-df83-4961-8c3b-26fa39a8f6a5')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Vectra Detection - Command & Control",
+                "description": "This query searches for Command and Control Detections triggered by one of Detect's AI models.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "CommonSecurityLog\n| where DeviceVendor == \"Vectra Networks\"\n| where DeviceProduct == \"X Series\"\n| where DeviceEventClassID != \"campaigns\" and DeviceEventClassID != \"hsc\" and DeviceEventClassID != \"audit\" and DeviceEventClassID != \"health\" and DeviceEventClassID != \"asc\" \n| extend cat = extract(\"cat=(.+?);\", 1, AdditionalExtensions) \n| where cat == \"COMMAND & CONTROL\" \n| project-rename threat_score = FlexNumber1\n| project-rename certainty_score = FlexNumber2\n| project-rename triaged = DeviceCustomString5\n| project-rename vectra_URL = DeviceCustomString4\n| project-rename detection_name = DeviceEventClassID\n| summarize arg_max(threat_score, *) by SourceHostName, detection_name\n| project  SourceHostName, SourceIP, DestinationIP, DestinationPort, DestinationHostName, detection_name, cat, threat_score, certainty_score, triaged, vectra_URL",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "CommandAndControl"
+                ],
+                "alertRuleTemplateName": "697a227e-18cc-4152-b549-7446cb47c051",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "SourceHostName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "SourceIP"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/c2e12ba8-2e7d-4e0d-bce6-c43ce22e13aa')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/c2e12ba8-2e7d-4e0d-bce6-c43ce22e13aa')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Vectra Detection - Exfiltration",
+                "description": "This query searches for Exfiltration Detections triggered by one of Detect's AI models.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "CommonSecurityLog\n| where DeviceVendor == \"Vectra Networks\"\n| where DeviceProduct == \"X Series\"\n| where DeviceEventClassID != \"campaigns\" and DeviceEventClassID != \"hsc\" and DeviceEventClassID != \"audit\" and DeviceEventClassID != \"health\" and DeviceEventClassID != \"asc\" \n| extend cat = extract(\"cat=(.+?);\", 1, AdditionalExtensions) \n| where cat == \"EXFILTRATION\" \n| project-rename threat_score = FlexNumber1\n| project-rename certainty_score = FlexNumber2\n| project-rename triaged = DeviceCustomString5\n| project-rename vectra_URL = DeviceCustomString4\n| project-rename detection_name = DeviceEventClassID\n| summarize arg_max(threat_score, *) by SourceHostName, detection_name\n| project  SourceHostName, SourceIP, DestinationIP, DestinationPort, DestinationHostName, detection_name, cat, threat_score, certainty_score, triaged, vectra_URL",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Exfiltration"
+                ],
+                "alertRuleTemplateName": "59887a28-1ccd-4f8a-81b8-864e0aada407",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "SourceHostName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "SourceIP"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/9b59b119-d88e-430a-84a2-b1a6b4819b3e')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/9b59b119-d88e-430a-84a2-b1a6b4819b3e')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Vectra Detection - Insights",
+                "description": "This query searches for Info Detections triggered by one of the Vectra AI models. \nThose are informative, providing security insights, and do not influence the score assigned to the Host.  They provide useful context to a Host or Account for an investigation.\nSome examples: New role seen for a host (e.g DNS server), novel port (used for the first time from this host), etc.",
+                "severity": "Low",
+                "enabled": true,
+                "query": "CommonSecurityLog\n| where DeviceVendor == \"Vectra Networks\"\n| where DeviceProduct == \"X Series\"\n| where DeviceEventClassID != \"campaigns\" and DeviceEventClassID != \"hsc\" and DeviceEventClassID != \"audit\" and DeviceEventClassID != \"health\" and DeviceEventClassID != \"asc\" \n| extend cat = extract(\"cat=(.+?);\", 1, AdditionalExtensions) \n| where cat == \"INFO\"\n| project-rename triaged = DeviceCustomString5\n| project-rename vectra_URL = DeviceCustomString4\n| project-rename detection_name = DeviceEventClassID\n| summarize arg_max(TimeGenerated, *) by SourceHostName, detection_name\n| project SourceHostName, SourceIP, DestinationIP, DestinationPort, DestinationHostName, detection_name, cat, triaged, vectra_URL",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "LateralMovement"
+                ],
+                "alertRuleTemplateName": "d378578c-0a89-447d-833a-f4043203df11",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "SourceHostName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "SourceIP"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/5a06eea0-c5af-4304-b61c-0e8b4e21f8a6')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/5a06eea0-c5af-4304-b61c-0e8b4e21f8a6')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Vectra Detection - Lateral Movement",
+                "description": "This query searches for Lateral Movement Detections triggered by one of Detect's AI models.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "CommonSecurityLog\n| where DeviceVendor == \"Vectra Networks\"\n| where DeviceProduct == \"X Series\"\n| where DeviceEventClassID != \"campaigns\" and DeviceEventClassID != \"hsc\" and DeviceEventClassID != \"audit\" and DeviceEventClassID != \"health\" and DeviceEventClassID != \"asc\" \n| extend cat = extract(\"cat=(.+?);\", 1, AdditionalExtensions) \n| where cat == \"LATERAL MOVEMENT\" \n| project-rename threat_score = FlexNumber1\n| project-rename certainty_score = FlexNumber2\n| project-rename triaged = DeviceCustomString5\n| project-rename vectra_URL = DeviceCustomString4\n| project-rename detection_name = DeviceEventClassID\n| summarize arg_max(threat_score, *) by SourceHostName, detection_name\n| project  SourceHostName, SourceIP, DestinationIP, DestinationPort, DestinationHostName, detection_name, cat, threat_score, certainty_score, triaged, vectra_URL",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "LateralMovement"
+                ],
+                "alertRuleTemplateName": "1a5861fc-dc83-4705-9dec-d7f670a139c0",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "SourceHostName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "SourceIP"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/74df78b1-d3b3-43bd-8103-a23df4973a3c')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/74df78b1-d3b3-43bd-8103-a23df4973a3c')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2021-03-01-preview",
+            "properties": {
+                "displayName": "Vectra Detection - Reconnaissance/Discovery",
+                "description": "This query searches for Reconnaissance Detections triggered by one of Detect's AI models.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "CommonSecurityLog\n| where DeviceVendor == \"Vectra Networks\"\n| where DeviceProduct == \"X Series\"\n| where DeviceEventClassID != \"campaigns\" and DeviceEventClassID != \"hsc\" and DeviceEventClassID != \"audit\" and DeviceEventClassID != \"health\" and DeviceEventClassID != \"asc\" \n| extend cat = extract(\"cat=(.+?);\", 1, AdditionalExtensions) \n| where cat == \"RECONNAISSANCE\" \n| project-rename threat_score = FlexNumber1\n| project-rename certainty_score = FlexNumber2\n| project-rename triaged = DeviceCustomString5\n| project-rename vectra_URL = DeviceCustomString4\n| project-rename detection_name = DeviceEventClassID\n| summarize arg_max(threat_score, *) by SourceHostName, detection_name\n| project  SourceHostName, SourceIP, DestinationIP, DestinationPort, DestinationHostName, detection_name, cat, threat_score, certainty_score, triaged, vectra_URL",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Discovery"
+                ],
+                "alertRuleTemplateName": "11b1376f-2ccf-4ebe-8e08-8515343af4fb",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "SourceHostName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "SourceIP"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}
