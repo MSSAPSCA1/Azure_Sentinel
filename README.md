@@ -1,9 +1,28 @@
 # [Azure Sentinel Hackathon 2021](https://github.com/MSSAPSCA1/Azure_Sentinel)
 **Azure Resource Manager (ARM) Templates for Bulk Activation of Azure Sentinel Analytics Rules.**
 
-Prerequisites:
-Active Azure Subscription with a resource groupe createed.
+**Prerequisites:**
+  1. Active Azure Subscription.
+  
+  2. Resource group with Azrure Sentinel service created.
+  
  [Create a free subscription with 200 USD](https://azure.microsoft.com/en-us/free/)
+ 
+**How to deploy the rules to your Resource group:**
+   
+   1. Login to Microsoft Azure.
+   
+   2. Search for "Azure Sentinel" using the search bar at the top of the window.
+   
+   3. Select "Azure Sentinel" under Services.
+   
+   4. Select the appropriate Resource group for your organization.
+   
+   5. Select "Analytics" under the Configuration section.
+   
+   6. #######
+ 
+## [Watch this video for a detailed explanation](https://www.youtube.com/watch?v=l71nTZFqkSk)
 ___
 ## [ARM Templates for Default Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/tree/main/Default_AZ_Sentinel_Rule_Templates)
 
