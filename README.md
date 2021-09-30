@@ -3,6 +3,7 @@
 
 The following process enables optimized deployment and modification of Azure Sentinel Analytics Rules. By accelerating the configuration of Analytics Rules, this process enables the Administrator to save time and resources.
 
+___
 ## How to bulk activate the default Azure Sentinel Analytics Rules
 
 ### Operating Instructions:
@@ -25,6 +26,7 @@ The following process enables optimized deployment and modification of Azure Sen
    8. Select the preferred JSON file from the previously downloaded and extracted file.
    9. The Deployment process will start.
 
+___
 ## How to edit the Azure Sentinel Analytics Rules to fit your organization's requirements
 
 ## [ARM Template Editor for Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/AZ_Sentinel_Analytics_Rules_Editor.py)
