@@ -9,7 +9,7 @@ The following process enables optimized deployment and modification of Azure Sen
 
 **Prerequisites:**
   * Active Azure Subscription.
-  * Resource group with Azrure Sentinel service created.
+  * Resource group with Azure Sentinel service created.
   
  [Create a free subscription with 200 USD](https://azure.microsoft.com/en-us/free/)
  
@@ -25,10 +25,11 @@ The following process enables optimized deployment and modification of Azure Sen
    8. Select the preferred JSON file from the previously downloaded and extracted file.
    9. The Deployment process will start.
 
-## How to edit the Azure Sentinel Analytics Rules to fit your organizations requirements
+## How to edit the Azure Sentinel Analytics Rules to fit your organization's requirements
 
 ## [ARM Template Editor for Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/AZ_Sentinel_Analytics_Rules_Editor.py)
 
+### Description:
 Python script to modify properties of Azure Resource Manager (ARM) templates for bulk modification of Azure Sentinel Analytics Rules. Currently capable of modifying Rule Status (Enabled/Disabled), Rule Frequency, and Rule Period for any number of Azure Sentinel Analytics Rules contained within any number of ARM template files.
 
 ### Notes from Azure Sentinel:
