@@ -1,5 +1,5 @@
 # [Azure Sentinel Hackathon 2021](https://github.com/MSSAPSCA1/Azure_Sentinel)
-**Azure Resource Manager (ARM) Templates for Bulk Activation of Azure Sentinel Analytics Rules.**
+**Azure Resource Manager (ARM) Templates and ARM Template Editor for Bulk Activation and Modification of Azure Sentinel Analytics Rules.**
 
 The following process enables optimized deployment and modification of Azure Sentinel Analytics Rules. By accelerating the configuration of Analytics Rules, this process enables the Administrator to save time and resources.
 
@@ -30,7 +30,7 @@ The following process enables optimized deployment and modification of Azure Sen
 ## [ARM Template Editor for Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/AZ_Sentinel_Analytics_Rules_Editor.py)
 
 ### Description:
-Python script to modify properties of Azure Resource Manager (ARM) templates for bulk modification of Azure Sentinel Analytics Rules. Currently capable of modifying Rule Status (Enabled/Disabled), Rule Frequency, and Rule Period for any number of Azure Sentinel Analytics Rules contained within any number of ARM template files.
+Python script to modify properties of ARM templates for bulk modification of Azure Sentinel Analytics Rules. Currently capable of modifying Rule Status (Enabled/Disabled), Rule Frequency, and Rule Period for any number of Azure Sentinel Analytics Rules contained within any number of ARM template files.
 
 ### Notes from Azure Sentinel:
 * The Rule Frequency (queryFrequency) value must be between 5 minutes and 14 days.
