@@ -54,7 +54,7 @@ Python script to modify properties of ARM templates for bulk modification of Azu
 5.  Once the process is completed, a new file or new files will be created at the same address as the original file(s) with the user-specified prefix appended as the prefix of the filename(s). You will now have two files for each ARM template, the orignal and the new file.
 
  
-### [Watch this video for a detailed explanation](https://www.youtube.com/watch?v=l71nTZFqkSk)
+### [Watch this video for a detailed explanation](https://youtu.be/f0YaSqNwJCM)
 
 ___
 ## [ARM Templates for Default Analytics Rules](https://github.com/MSSAPSCA1/Azure_Sentinel/tree/main/Default_AZ_Sentinel_Rule_Templates)
