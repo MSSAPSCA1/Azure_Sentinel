@@ -203,4 +203,4 @@ ARM templates for most of Azure Sentinel's built-in Scheduled Analytics Rules, m
 * [S-Z](https://github.com/MSSAPSCA1/Azure_Sentinel/blob/main/Quick_Response_AZ_Sentinel_Rule_Templates/QR_S-Z_Azure_Sentinel_Scheduled_Analytics_Rules.json)
 ___
 
-Disclaimer: The Analytics rules above do not include all the available rules in Azre Sentinel. They do not include any rules that monitor activity from a third party Data Connectors or any rules that require a pre-created data tables. The remaining rules will need to be created and configured based on the Organization's specification.
+Disclaimer: The Analytics rules above do not include all the available rules in Azre Sentinel. They do not include any rules that monitor activity from a third party Data Connectors or any rules that require a pre-created data tables. The remaining rules will need to be created and configured based on the Organization's specification. 
